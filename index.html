@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 1280px; height: 720px;
+  overflow: hidden; background: #0a0a16;
+}
+
+/* ── variables compartidas ── */
+:root {
+  --bg:        rgba(7,7,13,0.75);
+  --bg-dark:   rgba(7,7,13,0.75);
+  --radius:    12px;
+}
+
+/* ════════════════════════════════
+   MARCADOR
+════════════════════════════════ */
+#scoreboard {
+  position: absolute;
+  opacity: 0; transition: opacity 0.5s ease;
+}
+#scoreboard.visible { opacity: 1; }
+#scoreboard.bottom-center { bottom: 16px; left: 50%; transform: translateX(-50%); }
+#scoreboard.top-center    { top: 56px;    left: 50%; transform: translateX(-50%); }
+#scoreboard.bottom-left   { bottom: 16px; left: 36px; }
+#scoreboard.top-left      { top: 56px;    left: 36px; }
+
+.wrapper { display: flex; flex-direction: column; align-items: center; }
+
+.board {
+  display: flex; align-items: stretch;
+  height: 60px; width: 540px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-top: none;
+}
+
+/* equipos */
+.team {
+  display: flex; align-items: center; gap: 11px;
+  padding: 0 16px; flex: 1;
+  position: relative; overflow: hidden; min-width: 0;
+}
+.team::before {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(7,7,13,0.75);
+}
+.team.home { flex-direction: row-reverse; justify-content: flex-end; }
+.team.home .team-info { align-items: flex-end; text-align: right; }
+.team.home .sets-row  { flex-direction: row-reverse; justify-content: flex-start; }
+
+/* franjas de color */
+.team-stripe {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 4px; z-index: 2;
+}
+.team-stripe-tri {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 4px; z-index: 2; display: flex;
+}
+
+/* pelota de saque */
+.serve-ball {
+  font-size: 14px; line-height: 1;
+  flex-shrink: 0;
+  position: relative; z-index: 1;
+  opacity: 0; transition: opacity 0.25s; margin: 0 6px;
+}
+.serve-ball.visible { opacity: 1; }
+.serve-ball::after { content: '🏐'; }
+
+/* info equipo */
+.team-info {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; gap: 5px;
+  min-width: 0; flex: 1;
+}
+.name-row { display: flex; align-items: center; gap: 6px; }
+.team-name {
+  font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+  letter-spacing: 2.5px; color: #ffffff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1;
+}
+
+/* dots de sets */
+.sets-row { display: flex; flex-direction: row; gap: 8px; align-items: center; }
+.team.home .sets-row { flex-direction: row-reverse; justify-content: flex-start; }
+.set-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: rgba(255,255,255,0.35);
+  transition: background 0.4s ease, box-shadow 0.4s ease; flex-shrink: 0;
+}
+.set-dot.won { background: var(--dot-color); box-shadow: 0 0 8px var(--dot-color); }
+
+/* bloque central puntaje */
+.score-block {
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; width: 164px; position: relative;
+}
+.score-block::before {
+  content: ''; position: absolute; inset: 0; background: rgba(7,7,13,0.90);
+}
+.score-block::after {
+  content: ''; position: absolute; inset: 0;
+  border-left: 1px solid rgba(255,255,255,0.06);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  pointer-events: none;
+}
+.scores-row {
+  display: flex; align-items: center;
+  position: relative; z-index: 1;
+}
+.score {
+  font-family: 'Bebas Neue', sans-serif; font-size: 47px;
+  line-height: 1; width: 60px; text-align: center;
+}
+.score.home { color: var(--home-color, #FF5C1A); }
+.score.away { color: var(--away-color, #00e676); }
+.score.bump { animation: bump 0.28s ease; }
+@keyframes bump {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.32); }
+  100% { transform: scale(1); }
+}
+.score-sep {
+  font-family: 'Bebas Neue', sans-serif; font-size: 28px;
+  color: rgba(255,255,255,0.55); width: 20px; text-align: center;
+  position: relative; z-index: 1; line-height: 1;
+}
+
+/* lengüeta SET */
+.set-tab {
+  display: none;
+}
+
+/* ════════════════════════════════
+   TIEMPO MUERTO
+════════════════════════════════ */
+#timeout-banner {
+  position: absolute;
+  bottom: 90px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: stretch;
+  background: rgba(7,7,13,0.75);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.08);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#timeout-banner.visible { opacity: 1; }
+.timeout-bar  { width: 5px; flex-shrink: 0; }
+.timeout-inner { display: flex; align-items: center; gap: 14px; padding: 10px 24px; }
+.timeout-text { display: flex; flex-direction: column; gap: 2px; }
+.timeout-label {
+  font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 600;
+  color: #ffffff; letter-spacing: 3px; text-transform: uppercase;
+}
+.timeout-team {
+  font-family: 'Bebas Neue', sans-serif; font-size: 26px;
+  color: #ffffff; letter-spacing: 2px; line-height: 1;
+}
+.timeout-icon { display: flex; gap: 3px; align-items: center; }
+
+/* ════════════════════════════════
+   FIN DE SET
+════════════════════════════════ */
+#setfinish-banner {
+  position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: row; align-items: stretch;
+  background: rgba(7,7,13,0.85);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.08);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.5s ease;
+  overflow: hidden;
+}
+#setfinish-banner.visible { opacity: 1; }
+.setfinish-bar { width: 5px; flex-shrink: 0; }
+.setfinish-content {
+  display: flex; flex-direction: column;
+  padding: 16px 32px; gap: 6px;
+  align-items: center;
+}
+.setfinish-label {
+  font-family: 'DM Sans', sans-serif; font-size: 17px; font-weight: 600;
+  color: rgba(255,255,255,0.9); letter-spacing: 4px; text-transform: uppercase;
+}
+.setfinish-sets-score {
+  display: flex; align-items: center; justify-content: center;
+}
+.setfinish-sets-global {
+  font-family: 'Bebas Neue', sans-serif; font-size: 52px;
+  color: #ffffff; letter-spacing: 3px; line-height: 1;
+}
+.setfinish-sets-divider { display: none; }
+.setfinish-set-detail {
+  font-family: 'Bebas Neue', sans-serif; font-size: 24px;
+  color: rgba(255,255,255,0.7); letter-spacing: 1px; line-height: 1;
+  text-align: center;
+}
+
+/* ════════════════════════════════
+   RESULTADO FINAL
+════════════════════════════════ */
+#result-banner {
+  position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: row; align-items: stretch;
+  background: rgba(7,7,13,0.85);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.08);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+#result-banner.visible { opacity: 1; }
+
+.result-color-bar {
+  width: 5px; flex-shrink: 0;
+}
+.result-content {
+  display: flex; flex-direction: column;
+  padding: 16px 32px; gap: 8px;
+  align-items: flex-start;
+}
+.result-winner-label {
+  font-family: 'DM Sans', sans-serif; font-size: 17px; font-weight: 600;
+  color: rgba(255,255,255,0.9); letter-spacing: 4px; text-transform: uppercase;
+}
+.result-main-row {
+  display: flex; align-items: baseline; gap: 14px;
+}
+.result-winner-name {
+  font-family: 'Bebas Neue', sans-serif; font-size: 52px;
+  letter-spacing: 3px; line-height: 1;
+}
+.result-winner-score {
+  font-family: 'Bebas Neue', sans-serif; font-size: 52px;
+  letter-spacing: 2px; line-height: 1;
+  color: rgba(255,255,255,0.7);
+}
+.result-sets { display: flex; align-items: center; gap: 10px; }
+.result-set {
+  font-family: 'Bebas Neue', sans-serif; font-size: 26px;
+  color: rgba(255,255,255,0.8); letter-spacing: 1px;
+}
+.result-set-divider {
+  width: 1px; height: 18px; background: rgba(255,255,255,0.35);
+}</style>
+</head>
+<body>
+
+<div id="setfinish-banner">
+  <div class="setfinish-bar" id="setfinishBar"></div>
+  <div class="setfinish-content">
+    <div class="setfinish-label" id="setfinishLabel">FIN 1ER SET</div>
+    <div class="setfinish-sets-score">
+      <div class="setfinish-sets-global" id="setfinishGlobal">1-0</div>
+    </div>
+    <div class="setfinish-set-detail" id="setfinishDetail">25-17</div>
+  </div>
+</div>
+
+<div id="result-banner">
+  <div class="result-color-bar" id="resultBar"></div>
+  <div class="result-content">
+    <div class="result-winner-label">PARTIDO TERMINADO · GANADOR</div>
+    <div class="result-main-row">
+      <div class="result-winner-name" id="resultWinner"></div>
+      <div class="result-winner-score" id="resultScore"></div>
+    </div>
+    <div class="result-sets" id="resultSets"></div>
+  </div>
+</div>
+
+<div id="timeout-banner">
+  <div class="timeout-bar" id="timeoutBar" style="background:#FF5C1A"></div>
+  <div class="timeout-inner">
+    <div class="timeout-text">
+      <div class="timeout-label" id="timeoutLabel">TIEMPO MUERTO</div>
+      <div class="timeout-team" id="timeoutTeam">SAN GREGORIO</div>
+    </div>
+    <div class="timeout-icon">
+      <div style="width:3px;height:16px;background:#ffffff;border-radius:1px"></div>
+      <div style="width:3px;height:16px;background:#ffffff;border-radius:1px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Controles demo -->
+<div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:999">
+  <div id="demoLabel" style="font-family:sans-serif;font-size:13px;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.5);padding:6px 14px;border-radius:6px;letter-spacing:1px"></div>
+  <div style="display:flex;gap:8px">
+    <button id="btnPrev" style="font-family:sans-serif;font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer">← Anterior</button>
+    <button id="btnState" style="font-family:sans-serif;font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer">↺ Repetir</button>
+    <button id="btnNext" style="font-family:sans-serif;font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer">Siguiente →</button>
+  </div>
+  <div style="font-family:sans-serif;font-size:11px;color:rgba(255,255,255,0.35)">← → o Espacio para navegar</div>
+</div>
+
+<div id="scoreboard">
+  <div class="wrapper">
+    <div class="board">
+
+      <!-- Local -->
+      <div class="team home">
+        <div class="team-stripe-tri" id="homeStripe">
+          <div id="homeStripe1" style="flex:1"></div>
+          <div id="homeStripe2" style="flex:1"></div>
+          <div id="homeStripe3" style="flex:1"></div>
+        </div>
+        <div class="team-info">
+          <div class="name-row">
+            <div class="serve-ball" id="homeServe"></div>
+            <div class="team-name" id="homeName">SAN GREGORIO</div>
+          </div>
+          <div class="sets-row" id="homeSets">
+            <div class="set-dot" style="--dot-color:var(--home-color)"></div>
+            <div class="set-dot" style="--dot-color:var(--home-color)"></div>
+            <div class="set-dot" style="--dot-color:var(--home-color)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Marcador -->
+      <div class="score-block">
+        <div class="scores-row">
+          <div class="score home" id="homeScore">0</div>
+          <div class="score-sep">-</div>
+          <div class="score away" id="awayScore">0</div>
+        </div>
+      </div>
+
+      <!-- Visitante -->
+      <div class="team away">
+        <div class="team-stripe-tri" id="awayStripe">
+          <div id="awayStripe1" style="flex:1"></div>
+          <div id="awayStripe2" style="flex:1"></div>
+          <div id="awayStripe3" style="flex:1"></div>
+        </div>
+        <div class="team-info">
+          <div class="name-row">
+            <div class="team-name" id="awayName">VISITANTE</div>
+            <div class="serve-ball" id="awayServe"></div>
+          </div>
+          <div class="sets-row" id="awaySets">
+            <div class="set-dot" style="--dot-color:var(--away-color)"></div>
+            <div class="set-dot" style="--dot-color:var(--away-color)"></div>
+            <div class="set-dot" style="--dot-color:var(--away-color)"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="set-tab" id="setLabel">SET 1</div>
+  </div>
+</div>
+
+<script>
+const HOME_COLOR = '#FF5C1A';
+const AWAY_COLOR = '#00e676';
+
+document.documentElement.style.setProperty('--home-color', HOME_COLOR);
+document.documentElement.style.setProperty('--away-color', AWAY_COLOR);
+document.getElementById('homeName').textContent = 'SAN GREGORIO';
+document.getElementById('awayName').textContent = 'BPLP';
+['homeStripe1','homeStripe2','homeStripe3'].forEach(id => document.getElementById(id).style.background = HOME_COLOR);
+['awayStripe1','awayStripe2','awayStripe3'].forEach(id => document.getElementById(id).style.background = AWAY_COLOR);
+document.getElementById('scoreboard').className = 'bottom-center visible';
+
+function setScore(h, a) {
+  document.getElementById('homeScore').textContent = h;
+  document.getElementById('awayScore').textContent = a;
+}
+function setDots(elId, won) {
+  document.querySelectorAll('#' + elId + ' .set-dot').forEach((d, i) => d.classList.toggle('won', i < won));
+}
+function setServe(side) {
+  document.getElementById('homeServe').classList.toggle('visible', side === 'home');
+  document.getElementById('awayServe').classList.toggle('visible', side === 'away');
+}
+function hideAll() {
+  document.getElementById('timeout-banner').classList.remove('visible');
+  document.getElementById('setfinish-banner').classList.remove('visible');
+  document.getElementById('result-banner').classList.remove('visible');
+  document.getElementById('scoreboard').style.opacity = '1';
+}
+
+const states = [
+  () => {
+    hideAll();
+    setScore(14, 11); setDots('homeSets', 0); setDots('awaySets', 0); setServe('home');
+    document.getElementById('setLabel').textContent = 'SET 1';
+    document.getElementById('demoLabel').textContent = 'Estado: MARCADOR EN VIVO — Set 1, 14-11, local saca';
+  },
+  () => {
+    hideAll();
+    setScore(14, 11);
+    document.getElementById('timeoutTeam').textContent = 'BPLP';
+    document.getElementById('timeoutBar').style.background = AWAY_COLOR;
+    document.getElementById('timeoutLabel').textContent = '1ER TIEMPO MUERTO';
+    document.getElementById('timeout-banner').classList.add('visible');
+    document.getElementById('demoLabel').textContent = 'Estado: TIEMPO MUERTO — 1er tiempo muerto BPLP';
+  },
+  () => {
+    hideAll();
+    setScore(20, 18);
+    document.getElementById('timeoutTeam').textContent = 'SAN GREGORIO';
+    document.getElementById('timeoutBar').style.background = HOME_COLOR;
+    document.getElementById('timeoutLabel').textContent = '2DO TIEMPO MUERTO';
+    document.getElementById('timeout-banner').classList.add('visible');
+    document.getElementById('demoLabel').textContent = 'Estado: TIEMPO MUERTO — 2do tiempo muerto SAN GREGORIO';
+  },
+  () => {
+    hideAll();
+    document.getElementById('setfinishLabel').textContent = 'FIN 1ER SET';
+    document.getElementById('setfinishGlobal').textContent = '1-0';
+    document.getElementById('setfinishDetail').textContent = '25-22';
+    document.getElementById('setfinishBar').style.background = HOME_COLOR;
+    document.getElementById('setfinish-banner').classList.add('visible');
+    document.getElementById('scoreboard').style.opacity = '0';
+    setDots('homeSets', 1); setDots('awaySets', 0);
+    document.getElementById('demoLabel').textContent = 'Estado: FIN 1ER SET — 1-0 · 25-22';
+  },
+  () => {
+    hideAll();
+    document.getElementById('setfinishLabel').textContent = 'FIN 3ER SET';
+    document.getElementById('setfinishGlobal').textContent = '1-2';
+    document.getElementById('setfinishDetail').textContent = '25-22  |  21-25  |  22-25';
+    document.getElementById('setfinishBar').style.background = AWAY_COLOR;
+    document.getElementById('setfinish-banner').classList.add('visible');
+    document.getElementById('scoreboard').style.opacity = '0';
+    setDots('homeSets', 1); setDots('awaySets', 2);
+    document.getElementById('demoLabel').textContent = 'Estado: FIN 3ER SET — 1-2 · 25-22 | 21-25 | 22-25';
+  },
+  () => {
+    hideAll();
+    document.getElementById('resultWinner').textContent = 'SAN GREGORIO';
+    document.getElementById('resultWinner').style.color = HOME_COLOR;
+    document.getElementById('resultScore').textContent = '3-1';
+    document.getElementById('resultBar').style.background = HOME_COLOR;
+    document.getElementById('resultSets').innerHTML =
+      ['25-27','25-20','25-22','25-18'].map((s, i) =>
+        (i > 0 ? '<div class="result-set-divider"></div>' : '') + '<div class="result-set">' + s + '</div>'
+      ).join('');
+    document.getElementById('scoreboard').style.opacity = '0';
+    document.getElementById('result-banner').classList.add('visible');
+    document.getElementById('demoLabel').textContent = 'Estado: PARTIDO TERMINADO — SAN GREGORIO 3-1';
+  },
+];
+
+let current = 0;
+states[0]();
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { current = (current + 1) % states.length; states[current](); }
+  if (e.key === 'ArrowLeft') { current = (current - 1 + states.length) % states.length; states[current](); }
+});
+
+document.getElementById('btnPrev').addEventListener('click', () => { current = (current - 1 + states.length) % states.length; states[current](); });
+document.getElementById('btnNext').addEventListener('click', () => { current = (current + 1) % states.length; states[current](); });
+document.getElementById('btnState').addEventListener('click', () => { states[current](); });
+</script>
+</body>
+</html>

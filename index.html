@@ -719,23 +719,7 @@ async function loadConfigFromSupabase() {
       CONFIG.awayStripe = [away.color_stripe_1, away.color_stripe_2, away.color_stripe_3];
     }
 
-    // Aplicar posición dinámica
-    document.getElementById('scoreboard').style.cssText = '';
-    const pos = CONFIG.position || 'bottom-center';
-    const b = CONFIG.scoreboardBottom || 40;
-    if (pos === 'bottom-center') {
-      document.querySelector('#scoreboard.bottom-center') && null;
-    }
-    // Actualizar CSS var de bottom
-    const style = document.createElement('style');
-    style.textContent = `
-      #scoreboard.bottom-center { bottom: ${b}px !important; }
-      #scoreboard.bottom-left   { bottom: ${b}px !important; }
-      #scoreboard.top-center    { top: ${b}px !important; }
-      #scoreboard.top-left      { top: ${b}px !important; }
-      #timeout-banner           { bottom: ${b + 90}px !important; }
-    `;
-    document.head.appendChild(style);
+    // posición se aplica via clases CSS
 
   } catch(e) {
     console.log('Usando config por defecto', e);

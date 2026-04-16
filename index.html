@@ -353,6 +353,15 @@ html, body {
 </div>
 
 <script>
+
+// ── TEST: suma 1 cada 3 segundos, se resetea al recargar ──
+let testScore = 0;
+setInterval(() => {
+  testScore++;
+  document.getElementById('homeScore').textContent = testScore;
+}, 3000);
+// ────────────────────────────────────────────────────────────
+
 // ============================================================
 // CONFIGURACIÓN — editá estos valores antes del partido
 // ============================================================

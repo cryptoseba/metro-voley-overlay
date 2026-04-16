@@ -25,7 +25,7 @@ html, body {
   opacity: 0; transition: opacity 0.5s ease;
 }
 #scoreboard.visible { opacity: 1; }
-#scoreboard.bottom-center { bottom: 16px; left: 50%; transform: translateX(-50%); }
+#scoreboard.bottom-center { bottom: 40px; left: 50%; transform: translateX(-50%); }
 #scoreboard.top-center    { top: 56px;    left: 50%; transform: translateX(-50%); }
 #scoreboard.bottom-left   { bottom: 16px; left: 36px; }
 #scoreboard.top-left      { top: 56px;    left: 36px; }
@@ -144,7 +144,7 @@ html, body {
 ════════════════════════════════ */
 #timeout-banner {
   position: absolute;
-  bottom: 90px; left: 50%; transform: translateX(-50%);
+  bottom: 130px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: stretch;
   background: rgba(7,7,13,0.75);
   border-radius: var(--radius);
@@ -294,17 +294,6 @@ html, body {
   </div>
 </div>
 
-<!-- Controles demo -->
-<div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:999">
-  <div id="demoLabel" style="font-family:sans-serif;font-size:13px;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.5);padding:6px 14px;border-radius:6px;letter-spacing:1px"></div>
-  <div style="display:flex;gap:8px">
-    <button id="btnPrev" style="font-family:sans-serif;font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer">← Anterior</button>
-    <button id="btnState" style="font-family:sans-serif;font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer">↺ Repetir</button>
-    <button id="btnNext" style="font-family:sans-serif;font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer">Siguiente →</button>
-  </div>
-  <div style="font-family:sans-serif;font-size:11px;color:rgba(255,255,255,0.35)">← → o Espacio para navegar</div>
-</div>
-
 <div id="scoreboard">
   <div class="wrapper">
     <div class="board">
@@ -364,109 +353,356 @@ html, body {
 </div>
 
 <script>
-const HOME_COLOR = '#FF5C1A';
-const AWAY_COLOR = '#00e676';
+// ============================================================
+// CONFIGURACIÓN — editá estos valores antes del partido
+// ============================================================
+const CONFIG = {
+  matchId:      '240704',
+  homeName:     'SAN GREGORIO',
+  awayName:     'BPLP',
+  homeColor:    '#FF5C1A',           // color principal local
+  awayColor:    '#00e676',           // color principal visitante
+  homeStripe:   null,  // se carga desde config.json
+  awayStripe:   null,  // se carga desde config.json
+  position:     'bottom-center'
+};
+// ============================================================
 
-document.documentElement.style.setProperty('--home-color', HOME_COLOR);
-document.documentElement.style.setProperty('--away-color', AWAY_COLOR);
-document.getElementById('homeName').textContent = 'SAN GREGORIO';
-document.getElementById('awayName').textContent = 'BPLP';
-['homeStripe1','homeStripe2','homeStripe3'].forEach(id => document.getElementById(id).style.background = HOME_COLOR);
-['awayStripe1','awayStripe2','awayStripe3'].forEach(id => document.getElementById(id).style.background = AWAY_COLOR);
-document.getElementById('scoreboard').className = 'bottom-center visible';
+let prevHome = -1, prevAway = -1;
+let prevSetNumber = -1;
+let prevHomeSets = -1, prevAwaySets = -1;
+let localServing = null;
 
-function setScore(h, a) {
-  document.getElementById('homeScore').textContent = h;
-  document.getElementById('awayScore').textContent = a;
-}
-function setDots(elId, won) {
-  document.querySelectorAll('#' + elId + ' .set-dot').forEach((d, i) => d.classList.toggle('won', i < won));
-}
-function setServe(side) {
-  document.getElementById('homeServe').classList.toggle('visible', side === 'home');
-  document.getElementById('awayServe').classList.toggle('visible', side === 'away');
-}
-function hideAll() {
-  document.getElementById('timeout-banner').classList.remove('visible');
-  document.getElementById('setfinish-banner').classList.remove('visible');
-  document.getElementById('result-banner').classList.remove('visible');
-  document.getElementById('scoreboard').style.opacity = '1';
+function applyConfig(homeName, awayName) {
+  const { homeColor, awayColor, homeStripe, awayStripe, position } = CONFIG;
+
+  document.getElementById('scoreboard').className = position + ' visible';
+  document.getElementById('homeName').textContent = (homeName || 'LOCAL').toUpperCase();
+  document.getElementById('awayName').textContent = (awayName || 'VISITANTE').toUpperCase();
+
+  document.documentElement.style.setProperty('--home-color', homeColor || '#FF5C1A');
+  document.documentElement.style.setProperty('--away-color', awayColor || '#00e676');
+
+  // Barras de color
+  const hs = (homeStripe && homeStripe.length === 3) ? homeStripe : [homeColor, homeColor, homeColor];
+  const as = (awayStripe && awayStripe.length === 3) ? awayStripe : [awayColor, awayColor, awayColor];
+  document.getElementById('homeStripe1').style.background = hs[0];
+  document.getElementById('homeStripe2').style.background = hs[1];
+  document.getElementById('homeStripe3').style.background = hs[2];
+  document.getElementById('awayStripe1').style.background = as[0];
+  document.getElementById('awayStripe2').style.background = as[1];
+  document.getElementById('awayStripe3').style.background = as[2];
 }
 
-const states = [
-  () => {
-    hideAll();
-    setScore(14, 11); setDots('homeSets', 0); setDots('awaySets', 0); setServe('home');
-    document.getElementById('setLabel').textContent = 'SET 1';
-    document.getElementById('demoLabel').textContent = 'Estado: MARCADOR EN VIVO — Set 1, 14-11, local saca';
-  },
-  () => {
-    hideAll();
-    setScore(14, 11);
-    document.getElementById('timeoutTeam').textContent = 'BPLP';
-    document.getElementById('timeoutBar').style.background = AWAY_COLOR;
-    document.getElementById('timeoutLabel').textContent = '1ER TIEMPO MUERTO';
+let lastTimeoutId = null;
+let lastSetFinishId = null;
+let resultShown = false;
+
+// ── Cola de banners — evita que se pisen ─────────────────────
+const bannerQueue = [];
+let bannerBusy = false;
+
+function enqueueBanner(fn) {
+  bannerQueue.push(fn);
+  if (!bannerBusy) processQueue();
+}
+
+function processQueue() {
+  if (bannerQueue.length === 0) { bannerBusy = false; return; }
+  bannerBusy = true;
+  const next = bannerQueue.shift();
+  next();
+}
+
+function bannerDone() {
+  // Pequeña pausa entre banners
+  setTimeout(processQueue, 600);
+}
+
+// ── Mostrar tiempo muerto ─────────────────────────────────────
+function showTimeout(teamName, color, label, duration) {
+  enqueueBanner(() => {
+    document.getElementById('timeoutTeam').textContent = (teamName || '').toUpperCase();
+    document.getElementById('timeoutBar').style.background = color || '#ffffff';
+    document.getElementById('timeoutLabel').textContent = label || 'TIEMPO MUERTO';
     document.getElementById('timeout-banner').classList.add('visible');
-    document.getElementById('demoLabel').textContent = 'Estado: TIEMPO MUERTO — 1er tiempo muerto BPLP';
-  },
-  () => {
-    hideAll();
-    setScore(20, 18);
-    document.getElementById('timeoutTeam').textContent = 'SAN GREGORIO';
-    document.getElementById('timeoutBar').style.background = HOME_COLOR;
-    document.getElementById('timeoutLabel').textContent = '2DO TIEMPO MUERTO';
-    document.getElementById('timeout-banner').classList.add('visible');
-    document.getElementById('demoLabel').textContent = 'Estado: TIEMPO MUERTO — 2do tiempo muerto SAN GREGORIO';
-  },
-  () => {
-    hideAll();
-    document.getElementById('setfinishLabel').textContent = 'FIN 1ER SET';
-    document.getElementById('setfinishGlobal').textContent = '1-0';
-    document.getElementById('setfinishDetail').textContent = '25-22';
-    document.getElementById('setfinishBar').style.background = HOME_COLOR;
-    document.getElementById('setfinish-banner').classList.add('visible');
-    document.getElementById('scoreboard').style.opacity = '0';
-    setDots('homeSets', 1); setDots('awaySets', 0);
-    document.getElementById('demoLabel').textContent = 'Estado: FIN 1ER SET — 1-0 · 25-22';
-  },
-  () => {
-    hideAll();
-    document.getElementById('setfinishLabel').textContent = 'FIN 3ER SET';
-    document.getElementById('setfinishGlobal').textContent = '1-2';
-    document.getElementById('setfinishDetail').textContent = '25-22  |  21-25  |  22-25';
-    document.getElementById('setfinishBar').style.background = AWAY_COLOR;
-    document.getElementById('setfinish-banner').classList.add('visible');
-    document.getElementById('scoreboard').style.opacity = '0';
-    setDots('homeSets', 1); setDots('awaySets', 2);
-    document.getElementById('demoLabel').textContent = 'Estado: FIN 3ER SET — 1-2 · 25-22 | 21-25 | 22-25';
-  },
-  () => {
-    hideAll();
-    document.getElementById('resultWinner').textContent = 'SAN GREGORIO';
-    document.getElementById('resultWinner').style.color = HOME_COLOR;
-    document.getElementById('resultScore').textContent = '3-1';
-    document.getElementById('resultBar').style.background = HOME_COLOR;
-    document.getElementById('resultSets').innerHTML =
-      ['25-27','25-20','25-22','25-18'].map((s, i) =>
-        (i > 0 ? '<div class="result-set-divider"></div>' : '') + '<div class="result-set">' + s + '</div>'
-      ).join('');
-    document.getElementById('scoreboard').style.opacity = '0';
-    document.getElementById('result-banner').classList.add('visible');
-    document.getElementById('demoLabel').textContent = 'Estado: PARTIDO TERMINADO — SAN GREGORIO 3-1';
-  },
-];
+    setTimeout(() => {
+      document.getElementById('timeout-banner').classList.remove('visible');
+      bannerDone();
+    }, duration || 10000);
+  });
+}
 
-let current = 0;
-states[0]();
+// ── Mostrar fin de set ────────────────────────────────────────
+function showSetFinish(setNum, homeSetsWon, awaySetsWon, allSets, winnerSide) {
+  enqueueBanner(() => {
+    const ordinals = ['1ER', '2DO', '3ER', '4TO', '5TO'];
+    const label  = `FIN ${ordinals[setNum - 1] || setNum + 'TO'} SET`;
+    const global = `${homeSetsWon}-${awaySetsWon}`;
+    const detail = allSets
+      .filter(s => s.statusId === 2)
+      .map(s => `${s.homeTeamScore}-${s.awayTeamScore}`)
+      .join('  |  ');
+    const color = winnerSide === 'home' ? CONFIG.homeColor : CONFIG.awayColor;
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowRight' || e.key === ' ') { current = (current + 1) % states.length; states[current](); }
-  if (e.key === 'ArrowLeft') { current = (current - 1 + states.length) % states.length; states[current](); }
+    document.getElementById('setfinishLabel').textContent = label;
+    document.getElementById('setfinishGlobal').textContent = global;
+    document.getElementById('setfinishDetail').textContent = detail;
+    document.getElementById('setfinishBar').style.background = color;
+
+    const sb = document.getElementById('scoreboard');
+    sb.style.transition = 'opacity 0.4s ease';
+    sb.style.opacity = '0';
+    document.getElementById('setfinish-banner').classList.add('visible');
+
+    setTimeout(() => {
+      document.getElementById('setfinish-banner').classList.remove('visible');
+      sb.style.opacity = '1';
+      bannerDone();
+    }, 15000);
+  });
+}
+
+function updateSets(elId, won) {
+  document.querySelectorAll(`#${elId} .set-dot`).forEach((d, i) => d.classList.toggle('won', i < won));
+}
+
+function bump(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+}
+
+async function fetchScore() {
+  if (!CONFIG.matchId) return;
+  try {
+    const res = await fetch(`http://localhost:8080/api/matches/${CONFIG.matchId}/updates`);
+    if (!res.ok) { console.log('HTTP error:', res.status); return; }
+    const data = await res.json();
+
+    // Nombres desde la API si no están en CONFIG
+    if (!CONFIG._namesApplied) {
+      applyConfig(CONFIG.homeName || 'LOCAL', CONFIG.awayName || 'VISITANTE');
+      CONFIG._namesApplied = true;
+    }
+
+    const matchStatus = data.match?.statusId;
+
+    // ── 1. PARTIDO TERMINADO ──────────────────────────────────
+    if (matchStatus === 2 && !resultShown) {
+      resultShown = true;
+      // Limpiar cola, ocultar banners activos y forzar procesamiento inmediato
+      bannerQueue.length = 0;
+      bannerBusy = false;
+      document.getElementById('setfinish-banner').classList.remove('visible');
+      document.getElementById('timeout-banner').classList.remove('visible');
+
+      const isHomeWinner = data.match.homeTeamSets > data.match.awayTeamSets;
+      const winnerName   = isHomeWinner ? CONFIG.homeName : CONFIG.awayName;
+      const winnerColor  = isHomeWinner ? CONFIG.homeColor : CONFIG.awayColor;
+      const loserSets    = isHomeWinner ? data.match.awayTeamSets : data.match.homeTeamSets;
+      const winnerSets   = isHomeWinner ? data.match.homeTeamSets : data.match.awayTeamSets;
+      const sets = data.match.sets || [];
+
+      enqueueBanner(() => {
+        document.getElementById('resultSets').innerHTML = sets.map((s, i) => {
+          const divider = i > 0 ? '<div class="result-set-divider"></div>' : '';
+          return `${divider}<div class="result-set">${s.homeTeamScore}-${s.awayTeamScore}</div>`;
+        }).join('');
+        document.getElementById('resultWinner').textContent = (winnerName || 'GANADOR').toUpperCase();
+        document.getElementById('resultWinner').style.color = winnerColor || '#ffffff';
+        document.getElementById('resultScore').textContent = `${winnerSets}-${loserSets}`;
+        document.getElementById('resultBar').style.background = winnerColor || '#ffffff';
+
+        document.getElementById('scoreboard').style.transition = 'opacity 0.6s ease';
+        document.getElementById('scoreboard').style.opacity = '0';
+        document.getElementById('result-banner').classList.add('visible');
+
+        setTimeout(() => {
+          document.getElementById('result-banner').classList.remove('visible');
+          // El marcador NO vuelve — partido terminado
+        }, 20000);
+      });
+      return;
+    }
+
+    // ── 2. MARCADOR EN VIVO ───────────────────────────────────
+    const score = data.liveState?.score;
+    if (!score) return;
+
+    // Usar match.sets para el puntaje actual — más rápido que liveState.score.currentSet
+    // Si el set actual ya terminó (statusId 2), igual usamos ese score (es el final correcto)
+    const currentSetNumber = data.match?.currentSet ?? score.currentSet?.number ?? 1;
+    const currentSetData = data.match?.sets?.find(s => s.number === currentSetNumber);
+    const cs = currentSetData
+      ? { number: currentSetNumber, home: currentSetData.homeTeamScore, away: currentSetData.awayTeamScore }
+      : score.currentSet;
+
+    const homeSets = data.match?.homeTeamSets ?? score.sets?.home ?? 0;
+    const awaySets = data.match?.awayTeamSets ?? score.sets?.away ?? 0;
+
+    // Resetear al cambiar de set
+    if (cs.number !== prevSetNumber) {
+      prevSetNumber = cs.number;
+      prevHome = -1;
+      prevAway = -1;
+      localServing = null;
+    }
+
+    if (cs.home !== prevHome) {
+      document.getElementById('homeScore').textContent = cs.home;
+      if (prevHome >= 0) {
+        bump('homeScore');
+        localServing = 'home';
+        // Cerrar timeout banner si hay un punto nuevo
+        document.getElementById('timeout-banner').classList.remove('visible');
+        bannerQueue.length = 0;
+        bannerBusy = false;
+      }
+      prevHome = cs.home;
+    }
+    if (cs.away !== prevAway) {
+      document.getElementById('awayScore').textContent = cs.away;
+      if (prevAway >= 0) {
+        bump('awayScore');
+        localServing = 'away';
+        // Cerrar timeout banner si hay un punto nuevo
+        document.getElementById('timeout-banner').classList.remove('visible');
+        bannerQueue.length = 0;
+        bannerBusy = false;
+      }
+      prevAway = cs.away;
+    }
+    document.getElementById('setLabel').textContent = `SET ${cs.number}`;
+    updateSets('homeSets', homeSets);
+    updateSets('awaySets', awaySets);
+
+    // Saque: timeline si coincide con score actual (más confiable),
+    // si no coincide usamos localServing (cambio recién detectado),
+    // si tampoco hay usamos liveState.serving como último recurso
+    const timeline = data.liveState?.timeline || [];
+    const lastPoint = [...timeline].reverse().find(e =>
+      e.type === 'SCORE_POINT' && !e.undone && e.setNumber === cs.number
+    );
+    let serving;
+    if (lastPoint && lastPoint.score.home === cs.home && lastPoint.score.away === cs.away) {
+      serving = lastPoint.team;
+    } else if (localServing !== null) {
+      serving = localServing;
+    } else {
+      serving = data.liveState?.serving;
+    }
+    document.getElementById('homeServe').classList.toggle('visible', serving === 'home');
+    document.getElementById('awayServe').classList.toggle('visible', serving === 'away');
+
+    // ── 3. TIMEOUT ────────────────────────────────────────────
+    if (timeline.length > 0 && matchStatus === 3) {
+      // Buscar SET_START del set actual para anclar eventos — puede no existir
+      const setStart = [...timeline].reverse().find(e =>
+        e.type === 'SET_START' && e.setNumber === cs.number
+      );
+      const setStartTime = setStart ? new Date(setStart.timestamp).getTime() : 0;
+
+      // Solo eventos posteriores al inicio del set actual
+      const currentSetEvents = setStartTime > 0
+        ? timeline.filter(e => new Date(e.timestamp).getTime() >= setStartTime)
+        : timeline;
+
+      // Buscar el último TIMEOUT_CALLED directamente (no asumir que es el último evento)
+      const lastTimeout = [...currentSetEvents].reverse().find(e =>
+        e.type === 'TIMEOUT_CALLED' && !e.undone
+      );
+      if (lastTimeout && lastTimeout.id !== lastTimeoutId) {
+        const eventTime = new Date(lastTimeout.timestamp).getTime();
+        if (Date.now() - eventTime < 90000) {
+          lastTimeoutId = lastTimeout.id;
+          const teamName  = lastTimeout.team === 'home' ? CONFIG.homeName : CONFIG.awayName;
+          const teamColor = lastTimeout.team === 'home' ? CONFIG.homeColor : CONFIG.awayColor;
+          const count = currentSetEvents.filter(e =>
+            e.type === 'TIMEOUT_CALLED' && e.team === lastTimeout.team && !e.undone
+          ).length;
+          showTimeout(teamName, teamColor, count === 1 ? '1ER TIEMPO MUERTO' : '2DO TIEMPO MUERTO');
+        } else {
+          lastTimeoutId = lastTimeout.id;
+        }
+      }
+    }
+
+    // ── 4. FIN DE SET (solo si el partido sigue y el set no lo terminó) ──
+    if (matchStatus !== 2) {
+      const allSets = data.match?.sets || [];
+      const finishedSets = allSets.filter(s => s.statusId === 2);
+      const lastFinishedSet = finishedSets[finishedSets.length - 1];
+
+      // No mostrar si algún equipo ya tiene 3 sets (partido terminado en el fetch anterior)
+      const matchWouldBeOver = homeSets >= 3 || awaySets >= 3;
+
+      const triggerSetFinish = (winnerSide) => {
+        if (!lastFinishedSet || matchWouldBeOver) return;
+        showSetFinish(
+          lastFinishedSet.number,
+          homeSets, awaySets,
+          allSets,
+          winnerSide
+        );
+      };
+
+      // Caso 1: detectar cambio de sets ganados durante la sesión
+      if ((homeSets !== prevHomeSets || awaySets !== prevAwaySets) &&
+           prevHomeSets >= 0 && lastFinishedSet) {
+        const winner = homeSets > prevHomeSets ? 'home' : 'away';
+        triggerSetFinish(winner);
+      }
+
+      // Caso 2: primer fetch y hay un SET_FINISH reciente en el timeline (≤90s)
+      if (prevHomeSets < 0 && lastFinishedSet) {
+        const lastSetFinish = [...timeline].reverse().find(e => e.type === 'SET_FINISH' && !e.undone);
+        if (lastSetFinish) {
+          const eventTime = new Date(lastSetFinish.timestamp).getTime();
+          if (Date.now() - eventTime < 90000) {
+            triggerSetFinish(lastSetFinish.data?.winner);
+          }
+        }
+      }
+
+      prevHomeSets = homeSets;
+      prevAwaySets = awaySets;
+    }
+
+  } catch(e) { /* silencioso */ }
+}
+
+// ── Cargar config desde servidor al arrancar ──
+async function loadConfig() {
+  try {
+    const res = await fetch('http://localhost:8080/config');
+    if (!res.ok) return;
+    const cfg = await res.json();
+    for (const key of ['matchId','homeName','awayName','homeColor','awayColor','position']) {
+      if (cfg[key]) CONFIG[key] = cfg[key];
+    }
+    if (cfg.homeStripe) CONFIG.homeStripe = cfg.homeStripe;
+    if (cfg.awayStripe) CONFIG.awayStripe = cfg.awayStripe;
+  } catch(e) {}
+  applyConfig(CONFIG.homeName, CONFIG.awayName);
+  fetchScore();
+  setInterval(fetchScore, 3000);
+}
+loadConfig();
+
+// ── Live preview desde el panel ──
+window.addEventListener('message', (e) => {
+  if (e.data?.type !== 'CONFIG_UPDATE') return;
+  const c = e.data.config;
+  if (c.matchId)   CONFIG.matchId   = c.matchId;
+  if (c.homeName)  CONFIG.homeName  = c.homeName;
+  if (c.awayName)  CONFIG.awayName  = c.awayName;
+  if (c.homeColor) CONFIG.homeColor = c.homeColor;
+  if (c.awayColor) CONFIG.awayColor = c.awayColor;
+  if (c.homeStripe) CONFIG.homeStripe = c.homeStripe;
+  if (c.awayStripe) CONFIG.awayStripe = c.awayStripe;
+  if (c.position)  CONFIG.position  = c.position;
+  applyConfig(CONFIG.homeName, CONFIG.awayName);
 });
-
-document.getElementById('btnPrev').addEventListener('click', () => { current = (current - 1 + states.length) % states.length; states[current](); });
-document.getElementById('btnNext').addEventListener('click', () => { current = (current + 1) % states.length; states[current](); });
-document.getElementById('btnState').addEventListener('click', () => { states[current](); });
 </script>
 </body>
 </html>

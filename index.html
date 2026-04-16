@@ -353,15 +353,6 @@ html, body {
 </div>
 
 <script>
-
-// ── TEST: suma 1 cada 3 segundos, se resetea al recargar ──
-let testScore = 0;
-setInterval(() => {
-  testScore++;
-  document.getElementById('homeScore').textContent = testScore;
-}, 3000);
-// ────────────────────────────────────────────────────────────
-
 // ============================================================
 // CONFIGURACIÓN — editá estos valores antes del partido
 // ============================================================
@@ -484,7 +475,7 @@ function bump(id) {
 async function fetchScore() {
   if (!CONFIG.matchId) return;
   try {
-    const res = await fetch(`http://localhost:8080/api/matches/${CONFIG.matchId}/updates`);
+    const res = await fetch(`https://project-pa42k.vercel.app/api/matches/${CONFIG.matchId}/updates`);
     if (!res.ok) { console.log('HTTP error:', res.status); return; }
     const data = await res.json();
 
@@ -680,23 +671,10 @@ async function fetchScore() {
   } catch(e) { /* silencioso */ }
 }
 
-// ── Cargar config desde servidor al arrancar ──
-async function loadConfig() {
-  try {
-    const res = await fetch('http://localhost:8080/config');
-    if (!res.ok) return;
-    const cfg = await res.json();
-    for (const key of ['matchId','homeName','awayName','homeColor','awayColor','position']) {
-      if (cfg[key]) CONFIG[key] = cfg[key];
-    }
-    if (cfg.homeStripe) CONFIG.homeStripe = cfg.homeStripe;
-    if (cfg.awayStripe) CONFIG.awayStripe = cfg.awayStripe;
-  } catch(e) {}
-  applyConfig(CONFIG.homeName, CONFIG.awayName);
-  fetchScore();
-  setInterval(fetchScore, 3000);
-}
-loadConfig();
+// ── Iniciar overlay directamente con CONFIG hardcodeado ──
+applyConfig(CONFIG.homeName, CONFIG.awayName);
+fetchScore();
+setInterval(fetchScore, 3000);
 
 // ── Live preview desde el panel ──
 window.addEventListener('message', (e) => {

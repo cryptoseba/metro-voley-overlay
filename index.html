@@ -362,18 +362,30 @@ html, body {
 
 <script>
 // ============================================================
-// CONFIGURACIÓN — editá estos valores antes del partido
+// CONFIGURACIÓN — se carga desde Supabase automáticamente
 // ============================================================
+const SUPABASE_URL = 'https://wasegmbdptbhxojlfepa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indhc2VnbWJkcHRiaHhvamxmZXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjk0MzksImV4cCI6MjA5MTk0NTQzOX0.Qm_v0vD9OUIoE038rX0AHYa4QVEkrI9iEMzzEpdNzqo';
+const PROXY_URL = 'https://project-pa42k.vercel.app';
+
 const CONFIG = {
-  matchId:      '230204',
-  homeName:     'SAN GREGORIO',
-  awayName:     'BPLP',
-  homeColor:    '#FF5C1A',           // color principal local
-  awayColor:    '#00e676',           // color principal visitante
-  homeStripe:   null,  // se carga desde config.json
-  awayStripe:   null,  // se carga desde config.json
-  position:     'bottom-center'
+  matchId:   '158191',
+  homeName:  'LOCAL',
+  awayName:  'VISITANTE',
+  homeColor: '#FF5C1A',
+  awayColor: '#00e676',
+  homeStripe: null,
+  awayStripe: null,
+  position:  'bottom-center',
+  scoreboardBottom: 40
 };
+
+async function sbGet(table, filters='') {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${filters}`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  return res.json();
+}
 // ============================================================
 
 let prevHome = -1, prevAway = -1;
@@ -483,7 +495,7 @@ function bump(id) {
 async function fetchScore() {
   if (!CONFIG.matchId) return;
   try {
-    const res = await fetch(`https://project-pa42k.vercel.app/api/matches/${CONFIG.matchId}/updates`);
+    const res = await fetch(`${PROXY_URL}/api/matches/${CONFIG.matchId}/updates`);
     if (!res.ok) { console.log('HTTP error:', res.status); return; }
     const data = await res.json();
 
@@ -679,10 +691,75 @@ async function fetchScore() {
   } catch(e) { /* silencioso */ }
 }
 
-// ── Iniciar overlay directamente con CONFIG hardcodeado ──
-applyConfig(CONFIG.homeName, CONFIG.awayName);
-fetchScore();
-setInterval(fetchScore, 3000);
+// ── Cargar config desde Supabase al arrancar ─────────────────
+async function loadConfigFromSupabase() {
+  try {
+    const [cfgArr, teams] = await Promise.all([
+      sbGet('overlay_config', '?id=eq.1'),
+      sbGet('teams', '')
+    ]);
+    const cfg = cfgArr && cfgArr[0];
+    if (!cfg) throw new Error('no config');
+
+    CONFIG.matchId = cfg.match_id || CONFIG.matchId;
+    CONFIG.position = cfg.scoreboard_position || CONFIG.position;
+    CONFIG.scoreboardBottom = cfg.scoreboard_bottom || CONFIG.scoreboardBottom;
+
+    const home = teams && teams.find(t => t.id === cfg.home_team_id);
+    const away = teams && teams.find(t => t.id === cfg.away_team_id);
+
+    if (home) {
+      CONFIG.homeName  = home.name;
+      CONFIG.homeColor = home.color_primary;
+      CONFIG.homeStripe = [home.color_stripe_1, home.color_stripe_2, home.color_stripe_3];
+    }
+    if (away) {
+      CONFIG.awayName  = away.name;
+      CONFIG.awayColor = away.color_primary;
+      CONFIG.awayStripe = [away.color_stripe_1, away.color_stripe_2, away.color_stripe_3];
+    }
+
+    // Aplicar posición dinámica
+    document.getElementById('scoreboard').style.cssText = '';
+    const pos = CONFIG.position || 'bottom-center';
+    const b = CONFIG.scoreboardBottom || 40;
+    if (pos === 'bottom-center') {
+      document.querySelector('#scoreboard.bottom-center') && null;
+    }
+    // Actualizar CSS var de bottom
+    const style = document.createElement('style');
+    style.textContent = `
+      #scoreboard.bottom-center { bottom: ${b}px !important; }
+      #scoreboard.bottom-left   { bottom: ${b}px !important; }
+      #scoreboard.top-center    { top: ${b}px !important; }
+      #scoreboard.top-left      { top: ${b}px !important; }
+      #timeout-banner           { bottom: ${b + 90}px !important; }
+    `;
+    document.head.appendChild(style);
+
+  } catch(e) {
+    console.log('Usando config por defecto', e);
+  }
+  applyConfig(CONFIG.homeName, CONFIG.awayName);
+  fetchScore();
+  setInterval(fetchScore, 3000);
+  // Re-leer config de Supabase cada 30s por si cambió
+  setInterval(async () => {
+    const [cfgArr, teams] = await Promise.all([
+      sbGet('overlay_config', '?id=eq.1'),
+      sbGet('teams', '')
+    ]).catch(() => [null, null]);
+    if (!cfgArr || !cfgArr[0]) return;
+    const cfg = cfgArr[0];
+    const newMatchId = cfg.match_id || CONFIG.matchId;
+    if (newMatchId !== CONFIG.matchId) {
+      CONFIG.matchId = newMatchId;
+      prevHome = prevAway = prevHomeSets = prevAwaySets = -1;
+      resultShown = false;
+    }
+  }, 30000);
+}
+loadConfigFromSupabase();
 
 // ── Live preview desde el panel ──
 window.addEventListener('message', (e) => {

@@ -261,7 +261,36 @@ html, body {
 }
 .result-set-divider {
   width: 1px; height: 18px; background: rgba(255,255,255,0.35);
-}</style>
+}
+
+/* ════════════════════════════════
+   CARRUSEL DE PUBLICIDAD
+════════════════════════════════ */
+#carousel-banner {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 760px; height: 428px;
+  border-radius: 12px;
+  overflow: hidden;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.5s ease;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+#carousel-banner.visible { opacity: 1; }
+.carousel-slide {
+  position: absolute; inset: 0;
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.carousel-slide.active { opacity: 1; }
+.carousel-slide.exit { opacity: 0; }
+.carousel-slide img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+</style>
 </head>
 <body>
 
@@ -360,7 +389,7 @@ html, body {
   </div>
 </div>
 
-<script>
+<div id="carousel-banner"></div>
 // ============================================================
 // CONFIGURACIÓN — se carga desde Supabase automáticamente
 // ============================================================
@@ -709,6 +738,7 @@ async function loadConfigFromSupabase() {
     CONFIG.matchId = cfg.match_id || CONFIG.matchId;
     CONFIG.position = cfg.scoreboard_position || CONFIG.position;
     CONFIG.scoreboardBottom = cfg.scoreboard_bottom || CONFIG.scoreboardBottom;
+    CONFIG.activeOverlay = cfg.active_overlay || 'voley';
 
     const home = teams && teams.find(t => t.id === cfg.home_team_id);
     const away = teams && teams.find(t => t.id === cfg.away_team_id);
@@ -724,31 +754,83 @@ async function loadConfigFromSupabase() {
       CONFIG.awayStripe = [away.color_stripe_1, away.color_stripe_2, away.color_stripe_3];
     }
 
-    // posición se aplica via clases CSS
-
   } catch(e) {
     console.log('Usando config por defecto', e);
+    CONFIG.activeOverlay = 'voley';
   }
+
   applyConfig(CONFIG.homeName, CONFIG.awayName);
-  fetchScore();
-  setInterval(fetchScore, 3000);
-  // Re-leer config de Supabase cada 30s por si cambió
+
+  if (CONFIG.activeOverlay === 'carousel') {
+    startCarousel();
+  } else {
+    fetchScore();
+    setInterval(fetchScore, 3000);
+  }
+
+  // Re-leer config de Supabase cada 15s
   setInterval(async () => {
-    const [cfgArr, teams] = await Promise.all([
-      sbGet('overlay_config', '?id=eq.1'),
-      sbGet('teams', '')
-    ]).catch(() => [null, null]);
-    if (!cfgArr || !cfgArr[0]) return;
-    const cfg = cfgArr[0];
-    const newMatchId = cfg.match_id || CONFIG.matchId;
-    if (newMatchId !== CONFIG.matchId) {
-      CONFIG.matchId = newMatchId;
-      prevHome = prevAway = prevHomeSets = prevAwaySets = -1;
-      resultShown = false;
-    }
-  }, 30000);
+    try {
+      const cfgArr = await sbGet('overlay_config', '?id=eq.1');
+      if (!cfgArr || !cfgArr[0]) return;
+      const cfg = cfgArr[0];
+      const newMatchId = cfg.match_id || CONFIG.matchId;
+      const newOverlay = cfg.active_overlay || 'voley';
+      const newBottom = cfg.scoreboard_bottom || CONFIG.scoreboardBottom;
+
+      // Cambió el overlay activo → recargar página
+      if (newOverlay !== CONFIG.activeOverlay) {
+        location.reload();
+        return;
+      }
+
+      // Cambió el matchId
+      if (newMatchId !== CONFIG.matchId) {
+        CONFIG.matchId = newMatchId;
+        prevHome = prevAway = prevHomeSets = prevAwaySets = -1;
+        resultShown = false;
+      }
+
+      // Cambió la posición
+      if (newBottom !== CONFIG.scoreboardBottom) {
+        CONFIG.scoreboardBottom = newBottom;
+        applyConfig(CONFIG.homeName, CONFIG.awayName);
+      }
+    } catch(e) {}
+  }, 15000);
 }
 loadConfigFromSupabase();
+
+// ── Carrusel ──────────────────────────────────────────────────
+async function startCarousel() {
+  document.getElementById('scoreboard').style.opacity = '0';
+
+  const images = await sbGet('carousel_images', '?order=order_index&active=eq.true');
+  if (!images || !images.length) return;
+
+  const banner = document.getElementById('carousel-banner');
+
+  // Crear slides
+  images.forEach((img, i) => {
+    const div = document.createElement('div');
+    div.className = 'carousel-slide' + (i === 0 ? ' active' : '');
+    div.innerHTML = `<img src="${img.url}" alt="${img.title || ''}">`;
+    banner.appendChild(div);
+  });
+
+  banner.classList.add('visible');
+
+  let current = 0;
+  function nextSlide() {
+    const slides = banner.querySelectorAll('.carousel-slide');
+    const dur = (images[current]?.duration_seconds || 5) * 1000;
+    slides[current].classList.remove('active');
+    current = (current + 1) % slides.length;
+    slides[current].classList.add('active');
+    setTimeout(nextSlide, (images[current]?.duration_seconds || 5) * 1000);
+  }
+  setTimeout(nextSlide, (images[0]?.duration_seconds || 5) * 1000);
+}
 
 // ── Live preview desde el panel ──
 window.addEventListener('message', (e) => {

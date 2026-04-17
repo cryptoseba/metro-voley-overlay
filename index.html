@@ -25,7 +25,7 @@ html, body {
   opacity: 0; transition: opacity 0.5s ease;
 }
 #scoreboard.visible { opacity: 1; }
-#scoreboard.bottom-center { bottom: 40px; left: 50%; transform: translateX(-50%); }
+#scoreboard.bottom-center { bottom: var(--scoreboard-bottom, 40px); left: 50%; transform: translateX(-50%); }
 #scoreboard.top-center    { top: 56px;    left: 50%; transform: translateX(-50%); }
 #scoreboard.bottom-left   { bottom: 16px; left: 36px; }
 #scoreboard.top-left      { top: 56px;    left: 36px; }
@@ -152,7 +152,7 @@ html, body {
 ════════════════════════════════ */
 #timeout-banner {
   position: absolute;
-  bottom: 130px; left: 50%; transform: translateX(-50%);
+  bottom: var(--timeout-bottom, 130px); left: 50%; transform: translateX(-50%);
   display: flex; align-items: stretch;
   background: rgba(7,7,13,0.75);
   border-radius: var(--radius);
@@ -394,7 +394,7 @@ let prevHomeSets = -1, prevAwaySets = -1;
 let localServing = null;
 
 function applyConfig(homeName, awayName) {
-  const { homeColor, awayColor, homeStripe, awayStripe, position } = CONFIG;
+  const { homeColor, awayColor, homeStripe, awayStripe, position, scoreboardBottom } = CONFIG;
 
   document.getElementById('scoreboard').className = position + ' visible';
   document.getElementById('homeName').textContent = (homeName || 'LOCAL').toUpperCase();
@@ -402,6 +402,11 @@ function applyConfig(homeName, awayName) {
 
   document.documentElement.style.setProperty('--home-color', homeColor || '#FF5C1A');
   document.documentElement.style.setProperty('--away-color', awayColor || '#00e676');
+
+  // Posición dinámica via CSS variable
+  const b = scoreboardBottom || 40;
+  document.documentElement.style.setProperty('--scoreboard-bottom', b + 'px');
+  document.documentElement.style.setProperty('--timeout-bottom', (b + 90) + 'px');
 
   // Barras de color
   const hs = (homeStripe && homeStripe.length === 3) ? homeStripe : [homeColor, homeColor, homeColor];

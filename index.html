@@ -12,8 +12,8 @@ html, body {
 
 /* ── variables compartidas ── */
 :root {
-  --bg:        rgba(7,7,13,0.75);
-  --bg-dark:   rgba(7,7,13,0.75);
+  --bg:        rgba(7,7,13,0.65);
+  --bg-dark:   rgba(7,7,13,0.65);
   --radius:    12px;
 }
 
@@ -49,7 +49,7 @@ html, body {
 }
 .team::before {
   content: ''; position: absolute; inset: 0;
-  background: rgba(7,7,13,0.75);
+  background: rgba(7,7,13,0.65);
 }
 .team.home { flex-direction: row-reverse; justify-content: flex-end; }
 .team.home .team-info { align-items: flex-end; text-align: right; }
@@ -112,7 +112,7 @@ html, body {
   flex-shrink: 0; width: 164px; position: relative;
 }
 .score-block::before {
-  content: ''; position: absolute; inset: 0; background: rgba(7,7,13,0.90);
+  content: ''; position: absolute; inset: 0; background: rgba(7,7,13,0.80);
 }
 .score-block::after {
   content: ''; position: absolute; inset: 0;
@@ -154,7 +154,7 @@ html, body {
   position: absolute;
   bottom: var(--timeout-bottom, 130px); left: 50%; transform: translateX(-50%);
   display: flex; align-items: stretch;
-  background: rgba(7,7,13,0.75);
+  background: rgba(7,7,13,0.65);
   border-radius: var(--radius);
   border: 1px solid rgba(255,255,255,0.08);
   opacity: 0; pointer-events: none;
@@ -183,7 +183,7 @@ html, body {
   position: absolute;
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   display: flex; flex-direction: row; align-items: stretch;
-  background: rgba(7,7,13,0.85);
+  background: rgba(7,7,13,0.75);
   border-radius: var(--radius);
   border: 1px solid rgba(255,255,255,0.08);
   opacity: 0; pointer-events: none;
@@ -222,7 +222,7 @@ html, body {
   position: absolute;
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   display: flex; flex-direction: row; align-items: stretch;
-  background: rgba(7,7,13,0.85);
+  background: rgba(7,7,13,0.75);
   border-radius: var(--radius);
   border: 1px solid rgba(255,255,255,0.08);
   opacity: 0; pointer-events: none;

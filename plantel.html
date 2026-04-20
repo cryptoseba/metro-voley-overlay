@@ -284,7 +284,8 @@ async function loadConfigFromSupabase() {
       if (!cfg) return;
       const newOverlay = cfg.active_overlay || 'plantel';
       if (newOverlay !== CONFIG.activeOverlay) {
-        location.reload();
+        window.location.href = 'index.html';
+        return;
       }
       // Actualizar matchId si cambió
       if (cfg.match_id && cfg.match_id !== CONFIG.matchId) {

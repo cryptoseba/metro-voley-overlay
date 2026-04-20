@@ -15,21 +15,21 @@ html, body { width: 1280px; height: 720px; overflow: hidden; background: transpa
 #overlay.visible { opacity: 1; }
 
 #header {
-  position: absolute; top: 36px; left: 80px; right: 80px;
+  position: absolute; top: 24px; left: 80px; right: 80px;
   display: flex; align-items: flex-end; justify-content: space-between;
 }
 #teamNameWrap { display: flex; align-items: center; gap: 18px; }
-#teamLogo { width: 90px; height: 90px; object-fit: contain; flex-shrink: 0; display: none; }
+#teamLogo { width: 76px; height: 76px; object-fit: contain; flex-shrink: 0; display: none; }
 #teamName {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 88px; line-height: 1; color: #ffffff; letter-spacing: 4px;
+  font-size: 72px; line-height: 1; color: #ffffff; letter-spacing: 4px;
 }
-#headerRight { text-align: right; display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
-#plantelLabel { font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 5px; }
-#matchLabel { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); letter-spacing: 2px; text-transform: uppercase; }
+#headerRight { text-align: right; display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; }
+#plantelLabel { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 5px; }
+#matchLabel { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); letter-spacing: 2px; text-transform: uppercase; }
 
 #divider {
-  position: absolute; top: 148px; left: 80px; right: 80px;
+  position: absolute; top: 118px; left: 80px; right: 80px;
   height: 2px; background: rgba(255,255,255,0.07);
 }
 #divider-color {
@@ -37,7 +37,7 @@ html, body { width: 1280px; height: 720px; overflow: hidden; background: transpa
 }
 
 #grid {
-  position: absolute; top: 168px; left: 80px; right: 80px; bottom: 56px;
+  position: absolute; top: 136px; left: 80px; right: 80px; bottom: 20px;
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start;
   overflow: hidden;
 }
@@ -106,10 +106,6 @@ html, body { width: 1280px; height: 720px; overflow: hidden; background: transpa
   </div>
   <div id="divider"><div id="divider-color"></div></div>
   <div id="grid"></div>
-  <div id="footer">
-    <div id="footerLeft">● Metro Voley Argentina</div>
-    <button id="switchBtn" onclick="switchTeam()">Cambiar equipo →</button>
-  </div>
 </div>
 
 <script>
@@ -180,48 +176,47 @@ function renderPlayers(side, courtData) {
     if (!seen[p.id]) { seen[p.id] = true; all.push(p); }
   });
   all.sort((a,b) => a.number - b.number);
+  // Máximo 15 jugadoras
+  const display = all.slice(0, 15);
 
   const grid = document.getElementById('grid');
 
-  if (!all.length) {
+  if (!display.length) {
     grid.innerHTML = '';
     return;
   }
 
-  // Altura dinámica: grid tiene ~496px disponibles (720 - 168 - 56)
-  // filas = ceil(count/3), altura = (496 - gap*(filas-1)) / filas
-  const rows = Math.ceil(all.length / 3);
-  const gridH = 496;
-  const gap   = 6;
-  const rowH  = Math.floor((gridH - gap * (rows - 1)) / rows);
-  const clampH = Math.max(44, Math.min(72, rowH));
-  const numSize  = Math.round(clampH * 0.55);
-  const lastSize = Math.max(12, Math.round(clampH * 0.28));
-  const firstSize = Math.max(10, Math.round(clampH * 0.19));
+  // Altura dinámica: grid tiene 564px (720 - 136 - 20)
+  const nRows  = Math.ceil(display.length / 3);
+  const gridH  = 564;
+  const gap    = 6;
+  const rowH   = Math.floor((gridH - gap * (nRows - 1)) / nRows);
+  const clampH = Math.max(44, Math.min(76, rowH));
+  const numSize   = Math.round(clampH * 0.52);
+  const lastSize  = Math.max(12, Math.round(clampH * 0.26));
+  const firstSize = Math.max(10, Math.round(clampH * 0.18));
 
-  grid.innerHTML = all.map(p => {
+  grid.innerHTML = display.map(p => {
     const inCourt  = !!courtIds[p.id];
     const numColor = inCourt ? color : dimColor;
-    let badges = '';
-    if (p.isCaptain) badges += `<span class="badge badge-cap">CAP</span>`;
-    if (p.isLibero)  badges += `<span class="badge badge-lib">LIB</span>`;
-    if (inCourt)     badges += `<span class="badge" style="background:rgba(${rgb},0.15);color:${color}">●</span>`;
+    // CAP/LIB como sufijo del nombre, EN CANCHA como punto de color
+    const suffix = (p.isCaptain ? ' ©' : '') + (p.isLibero ? ' L' : '');
+    const dot = inCourt ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};margin-left:4px;vertical-align:middle"></span>` : '';
     return `<div class="player-row${inCourt ? ' on-court' : ''}" style="height:${clampH}px">
       <div class="player-accent" style="background:${numColor}"></div>
-      <div class="player-num" style="color:${numColor};font-size:${numSize}px;width:${Math.round(clampH*0.8)}px">${p.number}</div>
+      <div class="player-num" style="color:${numColor};font-size:${numSize}px;width:${Math.round(clampH*0.78)}px">${p.number}</div>
       <div class="player-sep"></div>
-      <div class="player-info">
-        <div class="player-last" style="font-size:${lastSize}px">${p.lastName.toUpperCase()}</div>
+      <div class="player-info" style="padding:0 10px">
+        <div class="player-last" style="font-size:${lastSize}px">${p.lastName.toUpperCase()}<span style="font-size:${Math.round(lastSize*0.7)}px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;font-weight:400">${suffix}</span>${dot}</div>
         <div class="player-first" style="font-size:${firstSize}px">${p.firstName}</div>
       </div>
-      <div class="player-badges">${badges}</div>
     </div>`;
   }).join('');
 
   // Animación de entrada escalonada
   requestAnimationFrame(() => {
-    const rows = grid.querySelectorAll('.player-row');
-    rows.forEach((r, i) => setTimeout(() => r.classList.add('shown'), i * 40));
+    const rowEls = grid.querySelectorAll('.player-row');
+    rowEls.forEach((r, i) => setTimeout(() => r.classList.add('shown'), i * 35));
   });
 }
 

@@ -226,6 +226,8 @@ function switchTeam() {
   }, 300);
 }
 
+let lastCourtHash = null;
+
 async function fetchData() {
   if (!CONFIG.matchId) return;
   try {
@@ -233,6 +235,9 @@ async function fetchData() {
     const data = await res.json();
     const court = data.liveState?.court;
     if (court && (court.home || court.away)) {
+      const hash = JSON.stringify(court);
+      if (hash === lastCourtHash) return;
+      lastCourtHash = hash;
       liveData = data;
       renderPlayers(currentTeam, court);
     }
@@ -274,7 +279,7 @@ async function loadConfigFromSupabase() {
   document.getElementById('overlay').classList.add('visible');
 
   fetchData();
-  setInterval(fetchData, 5000);
+  setInterval(fetchData, 60000);
 
   // Re-leer config cada 15s — si cambia active_overlay recargar
   setInterval(async () => {
@@ -294,7 +299,7 @@ async function loadConfigFromSupabase() {
         fetchData();
       }
     } catch(e) {}
-  }, 15000);
+  }, 5000);
 }
 
 loadConfigFromSupabase();

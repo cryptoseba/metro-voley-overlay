@@ -767,6 +767,8 @@ async function loadConfigFromSupabase() {
     startCarousel();
   } else if (CONFIG.activeOverlay === 'plantel') {
     window.location.href = 'plantel.html';
+  } else if (CONFIG.activeOverlay === 'none') {
+    document.getElementById('scoreboard').style.opacity = '0';
   } else {
     fetchScore();
     setInterval(fetchScore, 3000);
@@ -805,7 +807,7 @@ async function loadConfigFromSupabase() {
         applyConfig(CONFIG.homeName, CONFIG.awayName);
       }
     } catch(e) {}
-  }, 15000);
+  }, 5000);
 }
 loadConfigFromSupabase();
 

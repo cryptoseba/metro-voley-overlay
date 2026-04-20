@@ -202,7 +202,7 @@ function renderPlayers(side, courtData) {
     let badgeHtml = '';
     if (p.isCaptain) badgeHtml += `<span style="font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.6)">CAP</span>`;
     if (p.isLibero)  badgeHtml += `<span style="font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);margin-top:2px">LIB</span>`;
-    const dot = inCourt ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};margin-left:5px;vertical-align:middle;flex-shrink:0"></span>` : '';
+    const dot = inCourt ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};margin-left:8px;flex-shrink:0;align-self:center"></span>` : '';
     return `<div class="player-row${inCourt ? ' on-court' : ''}" style="height:${clampH}px">
       <div class="player-accent" style="background:${numColor}"></div>
       <div class="player-num" style="color:${numColor};font-size:${numSize}px;width:${Math.round(clampH*0.78)}px">${p.number}</div>

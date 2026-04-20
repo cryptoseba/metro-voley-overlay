@@ -765,6 +765,8 @@ async function loadConfigFromSupabase() {
 
   if (CONFIG.activeOverlay === 'carousel') {
     startCarousel();
+  } else if (CONFIG.activeOverlay === 'plantel') {
+    window.location.href = 'plantel.html';
   } else {
     fetchScore();
     setInterval(fetchScore, 3000);
@@ -782,6 +784,10 @@ async function loadConfigFromSupabase() {
 
       // Cambió el overlay activo → recargar página
       if (newOverlay !== CONFIG.activeOverlay) {
+        if (newOverlay === 'plantel') {
+          window.location.href = 'plantel.html';
+          return;
+        }
         location.reload();
         return;
       }

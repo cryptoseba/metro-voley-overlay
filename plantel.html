@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1280px; height: 720px; overflow: hidden; background: transparent; }
+
+#overlay {
+  position: absolute; inset: 0;
+  background: rgba(8,8,16,0.93);
+  opacity: 0; transition: opacity 0.6s ease;
+}
+#overlay.visible { opacity: 1; }
+
+#header {
+  position: absolute; top: 36px; left: 80px; right: 80px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+}
+#teamNameWrap { display: flex; align-items: center; gap: 18px; }
+#teamLogo { width: 90px; height: 90px; object-fit: contain; flex-shrink: 0; display: none; }
+#teamName {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 88px; line-height: 1; color: #ffffff; letter-spacing: 4px;
+}
+#headerRight { text-align: right; display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
+#plantelLabel { font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 5px; }
+#matchLabel { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); letter-spacing: 2px; text-transform: uppercase; }
+
+#divider {
+  position: absolute; top: 148px; left: 80px; right: 80px;
+  height: 2px; background: rgba(255,255,255,0.07);
+}
+#divider-color {
+  height: 100%; width: 60px; transition: background 0.4s;
+}
+
+#grid {
+  position: absolute; top: 168px; left: 80px; right: 80px; bottom: 80px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-content: start;
+  overflow: hidden;
+}
+
+.player-row {
+  display: flex; align-items: stretch;
+  background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; height: 76px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.player-row.shown { opacity: 1; transform: translateY(0); }
+.player-row.on-court { background: rgba(255,255,255,0.09); }
+.player-accent { width: 3px; flex-shrink: 0; }
+.player-num {
+  font-family: 'Bebas Neue', sans-serif; font-size: 44px; line-height: 1;
+  width: 76px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+.player-sep { width: 1px; background: rgba(255,255,255,0.07); margin: 10px 0; flex-shrink: 0; }
+.player-info { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 12px; min-width: 0; }
+.player-last { font-family: 'DM Sans', sans-serif; font-size: 23px; font-weight: 700; color: #ffffff; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-first { font-family: 'DM Sans', sans-serif; font-size: 16px; color: rgba(255,255,255,0.75); }
+.player-badges { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 10px 8px 0; flex-shrink: 0; }
+.badge { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; padding: 3px 7px; border-radius: 3px; }
+.badge-cap { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); }
+.badge-lib { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+
+#footer {
+  position: absolute; bottom: 28px; left: 80px; right: 80px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#footerLeft {
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase;
+}
+#switchBtn {
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px;
+  padding: 6px 16px; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.5); transition: all 0.2s;
+}
+#switchBtn:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
+
+#no-data {
+  position: absolute; inset: 0;
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+}
+#no-data.visible { display: flex; }
+#no-data-text {
+  font-family: 'DM Sans', sans-serif; font-size: 16px;
+  color: rgba(255,255,255,0.35); letter-spacing: 2px; text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="header">
+    <div id="teamNameWrap">
+      <img id="teamLogo" src="" alt="">
+      <div id="teamName">CARGANDO</div>
+    </div>
+    <div id="headerRight">
+      <div id="plantelLabel">PLANTEL</div>
+      <div id="matchLabel">Metro Voley 2026</div>
+    </div>
+  </div>
+  <div id="divider"><div id="divider-color"></div></div>
+  <div id="grid"></div>
+  <div id="footer">
+    <div id="footerLeft">● Metro Voley Argentina</div>
+    <button id="switchBtn" onclick="switchTeam()">Cambiar equipo →</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wasegmbdptbhxojlfepa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indhc2VnbWJkcHRiaHhvamxmZXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjk0MzksImV4cCI6MjA5MTk0NTQzOX0.Qm_v0vD9OUIoE038rX0AHYa4QVEkrI9iEMzzEpdNzqo';
+const PROXY_URL   = 'https://project-pa42k.vercel.app';
+
+const CONFIG = {
+  matchId:    '',
+  homeName:   'LOCAL',
+  awayName:   'VISITANTE',
+  homeColor:  '#FF5C1A',
+  awayColor:  '#00e676',
+  homeStripe: null,
+  awayStripe: null,
+  homeLogo:   '',
+  awayLogo:   '',
+  activeOverlay: 'plantel'
+};
+
+let currentTeam = 'home';
+let liveData    = null;
+const FALLBACK  = { home: { positions: {}, bench: [] }, away: { positions: {}, bench: [] } };
+
+async function sbGet(table, filters='') {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${filters}`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  return res.json();
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+function applyTheme(side) {
+  const color  = side === 'home' ? CONFIG.homeColor : CONFIG.awayColor;
+  const name   = side === 'home' ? CONFIG.homeName  : CONFIG.awayName;
+  const logo   = side === 'home' ? CONFIG.homeLogo  : CONFIG.awayLogo;
+  const other  = side === 'home' ? CONFIG.awayName  : CONFIG.homeName;
+
+  document.getElementById('teamName').textContent = name.toUpperCase();
+  document.getElementById('plantelLabel').style.color = color;
+  document.getElementById('divider-color').style.background = color;
+  document.getElementById('switchBtn').textContent = `Ver ${other} →`;
+
+  const logoEl = document.getElementById('teamLogo');
+  if (logo) { logoEl.src = logo; logoEl.style.display = 'block'; }
+  else       { logoEl.src = '';  logoEl.style.display = 'none';  }
+}
+
+function renderPlayers(side, courtData) {
+  const color   = side === 'home' ? CONFIG.homeColor : CONFIG.awayColor;
+  const dimColor = color + '88';
+  const rgb     = hexToRgb(color);
+  const teamData = (courtData && courtData[side]) || FALLBACK[side];
+
+  const onCourt  = Object.values(teamData.positions || {});
+  const onBench  = teamData.bench || [];
+  const courtIds = {};
+  onCourt.forEach(p => courtIds[p.id] = true);
+
+  const seen = {}, all = [];
+  onCourt.concat(onBench).forEach(p => {
+    if (!seen[p.id]) { seen[p.id] = true; all.push(p); }
+  });
+  all.sort((a,b) => a.number - b.number);
+
+  const grid = document.getElementById('grid');
+
+  if (!all.length) {
+    grid.innerHTML = '';
+    return;
+  }
+
+  grid.innerHTML = all.map(p => {
+    const inCourt  = !!courtIds[p.id];
+    const numColor = inCourt ? color : dimColor;
+    let badges = '';
+    if (p.isCaptain) badges += `<span class="badge badge-cap">CAP</span>`;
+    if (p.isLibero)  badges += `<span class="badge badge-lib">LIB</span>`;
+    if (inCourt)     badges += `<span class="badge" style="background:rgba(${rgb},0.15);color:${color}">EN CANCHA</span>`;
+    return `<div class="player-row${inCourt ? ' on-court' : ''}">
+      <div class="player-accent" style="background:${numColor}"></div>
+      <div class="player-num" style="color:${numColor}">${p.number}</div>
+      <div class="player-sep"></div>
+      <div class="player-info">
+        <div class="player-last">${p.lastName.toUpperCase()}</div>
+        <div class="player-first">${p.firstName}</div>
+      </div>
+      <div class="player-badges">${badges}</div>
+    </div>`;
+  }).join('');
+
+  // Animación de entrada escalonada
+  requestAnimationFrame(() => {
+    const rows = grid.querySelectorAll('.player-row');
+    rows.forEach((r, i) => setTimeout(() => r.classList.add('shown'), i * 40));
+  });
+}
+
+function switchTeam() {
+  currentTeam = currentTeam === 'home' ? 'away' : 'home';
+  // Limpiar con fade
+  const grid = document.getElementById('grid');
+  grid.querySelectorAll('.player-row').forEach(r => r.classList.remove('shown'));
+  setTimeout(() => {
+    applyTheme(currentTeam);
+    const court = liveData?.liveState?.court;
+    renderPlayers(currentTeam, court || FALLBACK);
+  }, 300);
+}
+
+async function fetchData() {
+  if (!CONFIG.matchId) return;
+  try {
+    const res  = await fetch(`${PROXY_URL}/api/matches/${CONFIG.matchId}/updates`);
+    const data = await res.json();
+    const court = data.liveState?.court;
+    if (court && (court.home || court.away)) {
+      liveData = data;
+      renderPlayers(currentTeam, court);
+    }
+  } catch(e) {}
+}
+
+async function loadConfigFromSupabase() {
+  try {
+    const [cfgArr, teams] = await Promise.all([
+      sbGet('overlay_config', '?id=eq.1'),
+      sbGet('teams', '')
+    ]);
+    const cfg = cfgArr && cfgArr[0];
+    if (!cfg) throw new Error('no config');
+
+    CONFIG.matchId       = cfg.match_id || CONFIG.matchId;
+    CONFIG.activeOverlay = cfg.active_overlay || 'plantel';
+
+    const home = teams?.find(t => t.id === cfg.home_team_id);
+    const away = teams?.find(t => t.id === cfg.away_team_id);
+
+    if (home) {
+      CONFIG.homeName   = home.name;
+      CONFIG.homeColor  = home.color_primary;
+      CONFIG.homeStripe = [home.color_stripe_1, home.color_stripe_2, home.color_stripe_3];
+      CONFIG.homeLogo   = home.logo_url || '';
+    }
+    if (away) {
+      CONFIG.awayName   = away.name;
+      CONFIG.awayColor  = away.color_primary;
+      CONFIG.awayStripe = [away.color_stripe_1, away.color_stripe_2, away.color_stripe_3];
+      CONFIG.awayLogo   = away.logo_url || '';
+    }
+  } catch(e) {
+    console.log('Usando config por defecto', e);
+  }
+
+  applyTheme(currentTeam);
+  document.getElementById('overlay').classList.add('visible');
+
+  fetchData();
+  setInterval(fetchData, 5000);
+
+  // Re-leer config cada 15s — si cambia active_overlay recargar
+  setInterval(async () => {
+    try {
+      const cfgArr = await sbGet('overlay_config', '?id=eq.1');
+      const cfg = cfgArr && cfgArr[0];
+      if (!cfg) return;
+      const newOverlay = cfg.active_overlay || 'plantel';
+      if (newOverlay !== CONFIG.activeOverlay) {
+        location.reload();
+      }
+      // Actualizar matchId si cambió
+      if (cfg.match_id && cfg.match_id !== CONFIG.matchId) {
+        CONFIG.matchId = cfg.match_id;
+        liveData = null;
+        fetchData();
+      }
+    } catch(e) {}
+  }, 15000);
+}
+
+loadConfigFromSupabase();
+</script>
+</body>
+</html>

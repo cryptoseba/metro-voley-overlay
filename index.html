@@ -792,10 +792,12 @@ async function loadConfigFromSupabase() {
     }
 
   } catch(e) {
-    console.log('Usando config por defecto', e);
+    console.log('Error cargando config de Supabase:', e.message);
     CONFIG.activeOverlay = 'voley';
+    CONFIG.dataSource = 'dataproject';
   }
 
+  console.log('activeOverlay:', CONFIG.activeOverlay, 'dataSource:', CONFIG.dataSource, 'matchId:', CONFIG.matchId);
   applyConfig(CONFIG.homeName, CONFIG.awayName);
 
   if (CONFIG.activeOverlay === 'carousel') {
@@ -806,6 +808,7 @@ async function loadConfigFromSupabase() {
     document.getElementById('scoreboard').style.opacity = '0';
   } else {
     if (CONFIG.dataSource === 'dataproject') {
+      console.log('Iniciando SignalR para matchId:', CONFIG.matchId);
       initSignalR();
     } else {
       applyConfig(CONFIG.homeName, CONFIG.awayName);

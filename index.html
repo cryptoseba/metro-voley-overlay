@@ -419,12 +419,246 @@ async function sbGet(table, filters='') {
 }
 // ============================================================
 
-let prevHome = -1, prevAway = -1;
-let prevSetNumber = -1;
-let prevHomeSets = -1, prevAwaySets = -1;
-let localServing = null;
+// ── SignalR via Proxy ─────────────────────────────────────────
+let srToken = null;
+let srMsgId = null;
+let srPolling = false;
 
-function applyConfig(homeName, awayName) {
+async function initSignalR() {
+  if (!CONFIG.matchId) return;
+  try {
+    // 1. Negotiate + connect via Vercel proxy
+    const neg = await fetch(`${PROXY_URL}/api/signalr/negotiate?matchId=${CONFIG.matchId}`);
+    const negData = await neg.json();
+    if (negData.error) throw new Error(negData.error);
+    srToken = negData.token;
+    srMsgId = negData.messageId;
+
+    // 2. Get initial score
+    const scoreData = await srInvoke('getLiveScoreData_From_DV', [CONFIG.matchId, 'fmv']);
+    if (scoreData) {
+      applyConfig(CONFIG.homeName, CONFIG.awayName);
+      CONFIG._namesApplied = true;
+      processInitialScore(scoreData);
+    }
+
+    // 3. Start polling loop
+    srPolling = true;
+    srPollLoop();
+
+  } catch(e) {
+    console.log('SignalR proxy falló, usando fallback:', e.message);
+    applyConfig(CONFIG.homeName, CONFIG.awayName);
+    CONFIG._namesApplied = true;
+    fetchScoreFallback();
+    setInterval(fetchScoreFallback, 3000);
+  }
+}
+
+async function srInvoke(method, args) {
+  try {
+    const res = await fetch(`${PROXY_URL}/api/signalr/invoke`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ token: srToken, messageId: srMsgId, method, args, invokeId: Date.now() })
+    });
+    const data = await res.json();
+    return data.result;
+  } catch(e) { return null; }
+}
+
+async function srPollLoop() {
+  if (!srPolling) return;
+  try {
+    const res = await fetch(`${PROXY_URL}/api/signalr/poll?token=${encodeURIComponent(srToken)}&messageId=${encodeURIComponent(srMsgId)}`);
+    const data = await res.json();
+    if (data.C) srMsgId = data.C;
+
+    // Process messages
+    if (data.M && data.M.length) {
+      for (const msg of data.M) {
+        handleHubMessage(msg);
+      }
+    }
+  } catch(e) {
+    console.log('Poll error:', e.message);
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  // Continue polling
+  if (srPolling) srPollLoop();
+}
+
+function handleHubMessage(msg) {
+  const method = msg.M;
+  const args = msg.A || [];
+
+  if (method === 'updateMatchScoreData_DV') {
+    const obj = args[0] || {};
+    // obj.HP/GP = puntos set actual, obj.H/G = sets ganados, obj.S = status
+    const hp = obj.HP !== undefined ? obj.HP : 0;
+    const gp = obj.GP !== undefined ? obj.GP : 0;
+    processScoreUpdate(hp, gp, obj.H || 0, obj.G || 0, obj.S);
+  }
+
+  if (method === 'updatePlayByPlayLastRallyData') {
+    const list = args[0] || [];
+    if (!list.length) return;
+    const last = list[list.length - 1];
+    if (last.RallyT === 3 && last.Skill === 'T_' && last.RallyID !== lastTimeoutRallyId) {
+      lastTimeoutRallyId = last.RallyID;
+      const teamSide  = last.TeamHG === 1 ? 'home' : 'away';
+      const teamName  = teamSide === 'home' ? CONFIG.homeName : CONFIG.awayName;
+      const teamColor = teamSide === 'home' ? CONFIG.homeColor : CONFIG.awayColor;
+      const count = (args[0] || []).filter(r => r.RallyT === 3 && r.Skill === 'T_' && r.TeamHG === last.TeamHG).length;
+      showTimeout(teamName, teamColor, count === 1 ? '1ER TIEMPO MUERTO' : '2DO TIEMPO MUERTO');
+    }
+  }
+}
+
+function processInitialScore(score) {
+  // score: {WonSetHome, WonSetGuest, Set1Home, Set1Guest, ..., Status}
+  const homeSets = score.WonSetHome || 0;
+  const awaySets = score.WonSetGuest || 0;
+  const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
+  const currentSetIdx = homeSets + awaySets;
+  const key = setKeys[Math.min(currentSetIdx, 4)];
+  const hp = score[key + 'Home'] || 0;
+  const gp = score[key + 'Guest'] || 0;
+  processScoreUpdate(hp, gp, homeSets, awaySets, score.Status !== undefined ? score.Status : 1);
+}
+
+function processScoreUpdate(hp, gp, homeSets, awaySets, status) {
+  // ── PARTIDO TERMINADO ──
+  if (status === 0 && !resultShown) {
+    resultShown = true;
+    bannerQueue.length = 0;
+    bannerBusy = false;
+    document.getElementById('setfinish-banner').classList.remove('visible');
+    document.getElementById('timeout-banner').classList.remove('visible');
+
+    const isHomeWinner = homeSets > awaySets;
+    const winnerName  = isHomeWinner ? CONFIG.homeName : CONFIG.awayName;
+    const winnerColor = isHomeWinner ? CONFIG.homeColor : CONFIG.awayColor;
+    const winnerSets  = isHomeWinner ? homeSets : awaySets;
+    const loserSets   = isHomeWinner ? awaySets : homeSets;
+
+    enqueueBanner(() => {
+      let setsHtml = '';
+      if (scoreObj) {
+        const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
+        for (let i = 0; i < homeSets + awaySets; i++) {
+          const k = setKeys[i];
+          if (scoreObj[k+'Home'] !== undefined) {
+            setsHtml += (i > 0 ? '<div class="result-set-divider"></div>' : '') +
+              `<div class="result-set">${scoreObj[k+'Home']}-${scoreObj[k+'Guest']}</div>`;
+          }
+        }
+      }
+      document.getElementById('resultSets').innerHTML = setsHtml;
+      document.getElementById('resultWinner').textContent = (winnerName || 'GANADOR').toUpperCase();
+      document.getElementById('resultWinner').style.color = winnerColor || '#ffffff';
+      document.getElementById('resultScore').textContent = `${winnerSets}-${loserSets}`;
+      document.getElementById('resultBar').style.background = winnerColor || '#ffffff';
+      document.getElementById('scoreboard').style.transition = 'opacity 0.6s ease';
+      document.getElementById('scoreboard').style.opacity = '0';
+      document.getElementById('result-banner').classList.add('visible');
+      setTimeout(() => {
+        document.getElementById('result-banner').classList.remove('visible');
+      }, 20000);
+    });
+    return;
+  }
+
+  // ── MARCADOR EN VIVO ──
+  const currentSetNum = homeSets + awaySets + 1;
+
+  if (currentSetNum !== prevSetNumber) {
+    prevSetNumber = currentSetNum;
+    prevHome = -1;
+    prevAway = -1;
+    localServing = null;
+  }
+
+  if (hp !== prevHome) {
+    document.getElementById('homeScore').textContent = hp;
+    if (prevHome >= 0) {
+      bump('homeScore');
+      localServing = 'home';
+      document.getElementById('timeout-banner').classList.remove('visible');
+      bannerQueue.length = 0; bannerBusy = false;
+    }
+    prevHome = hp;
+  }
+  if (gp !== prevAway) {
+    document.getElementById('awayScore').textContent = gp;
+    if (prevAway >= 0) {
+      bump('awayScore');
+      localServing = 'away';
+      document.getElementById('timeout-banner').classList.remove('visible');
+      bannerQueue.length = 0; bannerBusy = false;
+    }
+    prevAway = gp;
+  }
+
+  document.getElementById('setLabel').textContent = `SET ${currentSetNum}`;
+  updateSets('homeSets', homeSets);
+  updateSets('awaySets', awaySets);
+
+  // Saque basado en último punto
+  const serving = localServing;
+  if (serving) {
+    document.getElementById('homeServe').classList.toggle('visible', serving === 'home');
+    document.getElementById('awayServe').classList.toggle('visible', serving === 'away');
+  }
+
+  // ── FIN DE SET ──
+  if ((homeSets !== prevHomeSets || awaySets !== prevAwaySets) && prevHomeSets >= 0) {
+    const winnerSide = homeSets > prevHomeSets ? 'home' : 'away';
+    const matchWouldBeOver = homeSets >= 3 || awaySets >= 3;
+    if (!matchWouldBeOver && scoreObj) {
+      const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
+      const allSets = [];
+      for (let i = 0; i < homeSets + awaySets; i++) {
+        const k = setKeys[i];
+        if (scoreObj[k+'Home'] !== undefined) allSets.push({ homeTeamScore: scoreObj[k+'Home'], awayTeamScore: scoreObj[k+'Guest'], statusId: 2 });
+      }
+      showSetFinish(homeSets + awaySets, homeSets, awaySets, allSets, winnerSide);
+    }
+  }
+
+  prevHomeSets = homeSets;
+  prevAwaySets = awaySets;
+}
+
+function handleSetEnd(list) {
+  // detectar fin de set desde play by play completo
+  // El último item con EndAction = true indica fin de set
+}
+
+// ── Fallback polling si SignalR no conecta ────────────────────
+async function fetchScoreFallback() {
+  if (!CONFIG.matchId) return;
+  try {
+    const res = await fetch(`${PROXY_URL}/api/matches/${CONFIG.matchId}/updates`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!CONFIG._namesApplied) { applyConfig(CONFIG.homeName, CONFIG.awayName); CONFIG._namesApplied = true; }
+    const matchStatus = data.match?.statusId;
+    if (matchStatus === 2 && !resultShown) {
+      const isHomeWinner = data.match.homeTeamSets > data.match.awayTeamSets;
+      processScoreUpdate(0, 0, data.match.homeTeamSets, data.match.awayTeamSets, 0, null);
+      return;
+    }
+    const score = data.liveState?.score;
+    if (!score) return;
+    const csNum = data.match?.currentSet ?? 1;
+    const csData = data.match?.sets?.find(s => s.number === csNum);
+    if (csData) {
+      processScoreUpdate(csData.homeTeamScore, csData.awayTeamScore,
+        data.match.homeTeamSets, data.match.awayTeamSets, 3, null);
+    }
+  } catch(e) {}
+}
   const { homeColor, awayColor, homeStripe, awayStripe, position, scoreboardBottom } = CONFIG;
 
   document.getElementById('scoreboard').className = position + ' visible';
@@ -741,6 +975,7 @@ async function loadConfigFromSupabase() {
     CONFIG.position = cfg.scoreboard_position || CONFIG.position;
     CONFIG.scoreboardBottom = cfg.scoreboard_bottom || CONFIG.scoreboardBottom;
     CONFIG.activeOverlay = cfg.active_overlay || 'voley';
+    CONFIG.dataSource = cfg.data_source || 'metrovoley';
 
     const home = teams && teams.find(t => t.id === cfg.home_team_id);
     const away = teams && teams.find(t => t.id === cfg.away_team_id);
@@ -770,8 +1005,14 @@ async function loadConfigFromSupabase() {
   } else if (CONFIG.activeOverlay === 'none') {
     document.getElementById('scoreboard').style.opacity = '0';
   } else {
-    fetchScore();
-    setInterval(fetchScore, 3000);
+    if (CONFIG.dataSource === 'dataproject') {
+      initSignalR();
+    } else {
+      applyConfig(CONFIG.homeName, CONFIG.awayName);
+      CONFIG._namesApplied = true;
+      fetchScoreFallback();
+      setInterval(fetchScoreFallback, 3000);
+    }
   }
 
   // Re-leer config de Supabase cada 15s

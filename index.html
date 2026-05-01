@@ -669,6 +669,26 @@ let lastTimeoutId = null;
 let lastSetFinishId = null;
 let resultShown = false;
 
+function applyConfig(homeName, awayName) {
+  const { homeColor, awayColor, homeStripe, awayStripe, position, scoreboardBottom } = CONFIG;
+  document.getElementById('scoreboard').className = position + ' visible';
+  document.getElementById('homeName').textContent = (homeName || 'LOCAL').toUpperCase();
+  document.getElementById('awayName').textContent = (awayName || 'VISITANTE').toUpperCase();
+  document.documentElement.style.setProperty('--home-color', homeColor || '#FF5C1A');
+  document.documentElement.style.setProperty('--away-color', awayColor || '#00e676');
+  const b = scoreboardBottom || 40;
+  document.documentElement.style.setProperty('--scoreboard-bottom', b + 'px');
+  document.documentElement.style.setProperty('--timeout-bottom', (b + 90) + 'px');
+  const hs = (homeStripe && homeStripe.length === 3) ? homeStripe : [homeColor, homeColor, homeColor];
+  const as = (awayStripe && awayStripe.length === 3) ? awayStripe : [awayColor, awayColor, awayColor];
+  document.getElementById('homeStripe1').style.background = hs[0];
+  document.getElementById('homeStripe2').style.background = hs[1];
+  document.getElementById('homeStripe3').style.background = hs[2];
+  document.getElementById('awayStripe1').style.background = as[0];
+  document.getElementById('awayStripe2').style.background = as[1];
+  document.getElementById('awayStripe3').style.background = as[2];
+}
+
 // ── Cola de banners — evita que se pisen ─────────────────────
 const bannerQueue = [];
 let bannerBusy = false;

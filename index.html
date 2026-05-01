@@ -519,7 +519,6 @@ function handleHubMessage(msg) {
 }
 
 function processInitialScore(score) {
-  // Resetear estado para datos iniciales
   resultShown = false;
   prevHome = -1;
   prevAway = -1;
@@ -529,30 +528,35 @@ function processInitialScore(score) {
   const homeSets = score.WonSetHome || 0;
   const awaySets = score.WonSetGuest || 0;
   const status   = score.Status !== undefined ? score.Status : 1;
-
-  // Set actual = último set jugado
   const totalSets = homeSets + awaySets;
-  const currentSetIdx = Math.max(0, totalSets - 1); // último set jugado
   const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
-  const key = setKeys[Math.min(currentSetIdx, 4)];
+
+  // Mostrar puntaje del último set jugado
+  const lastSetIdx = Math.max(0, totalSets - 1);
+  const key = setKeys[Math.min(lastSetIdx, 4)];
   const hp = score[key + 'Home'] || 0;
   const gp = score[key + 'Guest'] || 0;
 
-  // Si el partido terminó, mostrar resultado final
+  // Actualizar marcador con último set
+  document.getElementById('homeScore').textContent = hp;
+  document.getElementById('awayScore').textContent = gp;
+  document.getElementById('setLabel').textContent = `SET ${totalSets}`;
+  updateSets('homeSets', homeSets);
+  updateSets('awaySets', awaySets);
+  prevHome = hp;
+  prevAway = gp;
+  prevHomeSets = homeSets;
+  prevAwaySets = awaySets;
+
+  // Si partido terminado, mostrar banner de resultado
   if (status === 2) {
-    // Construir sets array para el banner
     const sets = [];
     for (let i = 0; i < totalSets; i++) {
       const k = setKeys[i];
-      if (score[k+'Home'] !== undefined) {
-        sets.push({ homeTeamScore: score[k+'Home'], awayTeamScore: score[k+'Guest'] });
-      }
+      sets.push({ homeTeamScore: score[k+'Home'] || 0, awayTeamScore: score[k+'Guest'] || 0 });
     }
     showResultBanner(homeSets, awaySets, sets);
-    return;
   }
-
-  processScoreUpdate(hp, gp, homeSets, awaySets, status);
 }
 
 function showResultBanner(homeSets, awaySets, sets) {

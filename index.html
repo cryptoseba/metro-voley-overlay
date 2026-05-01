@@ -828,6 +828,8 @@ async function loadConfigFromSupabase() {
     startCarousel();
   } else if (CONFIG.activeOverlay === 'plantel') {
     window.location.href = 'plantel.html';
+  } else if (CONFIG.activeOverlay === 'plantel_manual') {
+    window.location.href = 'plantel_manual.html';
   } else if (CONFIG.activeOverlay === 'none') {
     document.getElementById('scoreboard').style.opacity = '0';
   } else {
@@ -856,6 +858,10 @@ async function loadConfigFromSupabase() {
       if (newOverlay !== CONFIG.activeOverlay) {
         if (newOverlay === 'plantel') {
           window.location.href = 'plantel.html';
+          return;
+        }
+        if (newOverlay === 'plantel_manual') {
+          window.location.href = 'plantel_manual.html';
           return;
         }
         location.reload();

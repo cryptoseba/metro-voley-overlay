@@ -476,24 +476,19 @@ async function srInvoke(method, args) {
 async function srPollLoop() {
   if (!srPolling) return;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
     const res = await fetch(
-      `${PROXY_URL}/api/signalr/poll?token=${encodeURIComponent(srToken)}&messageId=${encodeURIComponent(srMsgId)}`,
-      { signal: controller.signal }
+      `${PROXY_URL}/api/signalr/poll?token=${encodeURIComponent(srToken)}&messageId=${encodeURIComponent(srMsgId)}`
     );
-    clearTimeout(timeout);
     const data = await res.json();
     if (data.C) srMsgId = data.C;
     if (data.M && data.M.length) {
       for (const msg of data.M) handleHubMessage(msg);
     }
   } catch(e) {
-    // Timeout o error — esperar un poco y reintentar
-    await new Promise(r => setTimeout(r, 1000));
+    // silencioso
   }
-  // Continuar siempre
-  if (srPolling) setTimeout(srPollLoop, 100);
+  // Polling cada 2 segundos
+  if (srPolling) setTimeout(srPollLoop, 2000);
 }
 
 function handleHubMessage(msg) {

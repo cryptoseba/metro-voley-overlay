@@ -519,15 +519,60 @@ function handleHubMessage(msg) {
 }
 
 function processInitialScore(score) {
-  // score: {WonSetHome, WonSetGuest, Set1Home, Set1Guest, ..., Status}
+  // Resetear estado para datos iniciales
+  resultShown = false;
+  prevHome = -1;
+  prevAway = -1;
+  prevHomeSets = -1;
+  prevAwaySets = -1;
+
   const homeSets = score.WonSetHome || 0;
   const awaySets = score.WonSetGuest || 0;
+  const status   = score.Status !== undefined ? score.Status : 1;
+
+  // Set actual = último set jugado
+  const totalSets = homeSets + awaySets;
+  const currentSetIdx = Math.max(0, totalSets - 1); // último set jugado
   const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
-  const currentSetIdx = homeSets + awaySets;
   const key = setKeys[Math.min(currentSetIdx, 4)];
   const hp = score[key + 'Home'] || 0;
   const gp = score[key + 'Guest'] || 0;
-  processScoreUpdate(hp, gp, homeSets, awaySets, score.Status !== undefined ? score.Status : 1);
+
+  // Si el partido terminó, mostrar resultado final
+  if (status === 2) {
+    // Construir sets array para el banner
+    const sets = [];
+    for (let i = 0; i < totalSets; i++) {
+      const k = setKeys[i];
+      if (score[k+'Home'] !== undefined) {
+        sets.push({ homeTeamScore: score[k+'Home'], awayTeamScore: score[k+'Guest'] });
+      }
+    }
+    showResultBanner(homeSets, awaySets, sets);
+    return;
+  }
+
+  processScoreUpdate(hp, gp, homeSets, awaySets, status);
+}
+
+function showResultBanner(homeSets, awaySets, sets) {
+  const isHomeWinner = homeSets > awaySets;
+  const winnerName   = isHomeWinner ? CONFIG.homeName : CONFIG.awayName;
+  const winnerColor  = isHomeWinner ? CONFIG.homeColor : CONFIG.awayColor;
+  const winnerSets   = isHomeWinner ? homeSets : awaySets;
+  const loserSets    = isHomeWinner ? awaySets : homeSets;
+
+  document.getElementById('resultSets').innerHTML = sets.map((s, i) =>
+    (i > 0 ? '<div class="result-set-divider"></div>' : '') +
+    `<div class="result-set">${s.homeTeamScore}-${s.awayTeamScore}`+`</div>`
+  ).join('');
+  document.getElementById('resultWinner').textContent = (winnerName || 'GANADOR').toUpperCase();
+  document.getElementById('resultWinner').style.color = winnerColor || '#ffffff';
+  document.getElementById('resultScore').textContent = `${winnerSets}-${loserSets}`;
+  document.getElementById('resultBar').style.background = winnerColor || '#ffffff';
+  document.getElementById('scoreboard').style.transition = 'opacity 0.6s ease';
+  document.getElementById('scoreboard').style.opacity = '0';
+  document.getElementById('result-banner').classList.add('visible');
 }
 
 function processScoreUpdate(hp, gp, homeSets, awaySets, status) {
@@ -538,37 +583,11 @@ function processScoreUpdate(hp, gp, homeSets, awaySets, status) {
     bannerBusy = false;
     document.getElementById('setfinish-banner').classList.remove('visible');
     document.getElementById('timeout-banner').classList.remove('visible');
-
-    const isHomeWinner = homeSets > awaySets;
-    const winnerName  = isHomeWinner ? CONFIG.homeName : CONFIG.awayName;
-    const winnerColor = isHomeWinner ? CONFIG.homeColor : CONFIG.awayColor;
-    const winnerSets  = isHomeWinner ? homeSets : awaySets;
-    const loserSets   = isHomeWinner ? awaySets : homeSets;
-
-    enqueueBanner(() => {
-      let setsHtml = '';
-      if (scoreObj) {
-        const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
-        for (let i = 0; i < homeSets + awaySets; i++) {
-          const k = setKeys[i];
-          if (scoreObj[k+'Home'] !== undefined) {
-            setsHtml += (i > 0 ? '<div class="result-set-divider"></div>' : '') +
-              `<div class="result-set">${scoreObj[k+'Home']}-${scoreObj[k+'Guest']}</div>`;
-          }
-        }
-      }
-      document.getElementById('resultSets').innerHTML = setsHtml;
-      document.getElementById('resultWinner').textContent = (winnerName || 'GANADOR').toUpperCase();
-      document.getElementById('resultWinner').style.color = winnerColor || '#ffffff';
-      document.getElementById('resultScore').textContent = `${winnerSets}-${loserSets}`;
-      document.getElementById('resultBar').style.background = winnerColor || '#ffffff';
-      document.getElementById('scoreboard').style.transition = 'opacity 0.6s ease';
-      document.getElementById('scoreboard').style.opacity = '0';
-      document.getElementById('result-banner').classList.add('visible');
-      setTimeout(() => {
-        document.getElementById('result-banner').classList.remove('visible');
-      }, 20000);
-    });
+    const sets = [];
+    for (let i = 0; i < homeSets + awaySets; i++) {
+      sets.push({ homeTeamScore: 0, awayTeamScore: 0 });
+    }
+    showResultBanner(homeSets, awaySets, sets);
     return;
   }
 

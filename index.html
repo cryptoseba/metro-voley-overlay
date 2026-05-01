@@ -637,18 +637,19 @@ function processScoreUpdate(hp, gp, homeSets, awaySets, status) {
     document.getElementById('awayServe').classList.toggle('visible', serving === 'away');
   }
 
+  // ── Si había banner de resultado y llega update en vivo, ocultarlo ──
+  if (resultShown && status !== 0 && status !== 2) {
+    resultShown = false;
+    document.getElementById('result-banner').classList.remove('visible');
+    document.getElementById('scoreboard').style.opacity = '1';
+  }
+
   // ── FIN DE SET ──
   if ((homeSets !== prevHomeSets || awaySets !== prevAwaySets) && prevHomeSets >= 0) {
     const winnerSide = homeSets > prevHomeSets ? 'home' : 'away';
     const matchWouldBeOver = homeSets >= 3 || awaySets >= 3;
-    if (!matchWouldBeOver && scoreObj) {
-      const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
-      const allSets = [];
-      for (let i = 0; i < homeSets + awaySets; i++) {
-        const k = setKeys[i];
-        if (scoreObj[k+'Home'] !== undefined) allSets.push({ homeTeamScore: scoreObj[k+'Home'], awayTeamScore: scoreObj[k+'Guest'], statusId: 2 });
-      }
-      showSetFinish(homeSets + awaySets, homeSets, awaySets, allSets, winnerSide);
+    if (!matchWouldBeOver) {
+      showSetFinish(homeSets + awaySets, homeSets, awaySets, [], winnerSide);
     }
   }
 

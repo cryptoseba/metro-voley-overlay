@@ -433,27 +433,27 @@ let prevAwaySets = -1;
 async function initSignalR() {
   if (!CONFIG.matchId) return;
   try {
-    // 1. Negotiate + connect via Vercel proxy
+    console.log('Llamando negotiate...');
     const neg = await fetch(`${PROXY_URL}/api/signalr/negotiate?matchId=${CONFIG.matchId}`);
+    console.log('Negotiate status:', neg.status);
     const negData = await neg.json();
+    console.log('Negotiate data:', JSON.stringify(negData).slice(0, 100));
     if (negData.error) throw new Error(negData.error);
     srToken = negData.token;
     srMsgId = negData.messageId;
-
-    // 2. Get initial score
+    console.log('Token OK, invoking...');
     const scoreData = await srInvoke('getLiveScoreData_From_DV', [CONFIG.matchId, 'fmv']);
+    console.log('Score data:', JSON.stringify(scoreData).slice(0, 200));
     if (scoreData) {
       applyConfig(CONFIG.homeName, CONFIG.awayName);
       CONFIG._namesApplied = true;
       processInitialScore(scoreData);
     }
-
-    // 3. Start polling loop
     srPolling = true;
+    console.log('Starting poll loop...');
     srPollLoop();
-
   } catch(e) {
-    console.log('SignalR proxy falló, usando fallback:', e.message);
+    console.log('SignalR proxy falló:', e.message);
     applyConfig(CONFIG.homeName, CONFIG.awayName);
     CONFIG._namesApplied = true;
     fetchScoreFallback();

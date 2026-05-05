@@ -679,9 +679,14 @@ async function fetchManualScore() {
     const s = data && data[0];
     if (!s) return;
     if (!CONFIG._namesApplied) { applyConfig(CONFIG.homeName, CONFIG.awayName); CONFIG._namesApplied = true; }
-    if (s.status === 'finished' && !resultShown) {
-      processScoreUpdate(0, 0, s.home_sets, s.away_sets, 0);
-      return;
+    if (s.status === 'finished') {
+      if (!resultShown) {
+        resultShown = true;
+        // Armar sets desde set_scores si existen
+        const setScores = s.set_scores ? JSON.parse(s.set_scores) : [];
+        showResultBanner(s.home_sets, s.away_sets, setScores);
+      }
+      return; // No seguir procesando — evita el loop
     }
     processScoreUpdate(s.home_points, s.away_points, s.home_sets, s.away_sets, 3);
   } catch(e) {}

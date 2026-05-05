@@ -672,6 +672,21 @@ function handleSetEnd(list) {
   // El último item con EndAction = true indica fin de set
 }
 
+// ── Modo manual — leer puntaje de Supabase ───────────────────
+async function fetchManualScore() {
+  try {
+    const data = await sbGet('manual_score', '?id=eq.1');
+    const s = data && data[0];
+    if (!s) return;
+    if (!CONFIG._namesApplied) { applyConfig(CONFIG.homeName, CONFIG.awayName); CONFIG._namesApplied = true; }
+    if (s.status === 'finished' && !resultShown) {
+      processScoreUpdate(0, 0, s.home_sets, s.away_sets, 0);
+      return;
+    }
+    processScoreUpdate(s.home_points, s.away_points, s.home_sets, s.away_sets, 3);
+  } catch(e) {}
+}
+
 // ── Fallback polling si SignalR no conecta ────────────────────
 async function fetchScoreFallback() {
   if (!CONFIG.matchId) return;
@@ -843,7 +858,12 @@ async function loadConfigFromSupabase() {
   } else if (CONFIG.activeOverlay === 'none') {
     document.getElementById('scoreboard').style.opacity = '0';
   } else {
-    if (CONFIG.dataSource === 'dataproject') {
+    if (CONFIG.dataSource === 'manual') {
+      applyConfig(CONFIG.homeName, CONFIG.awayName);
+      CONFIG._namesApplied = true;
+      fetchManualScore();
+      setInterval(fetchManualScore, 3000);
+    } else if (CONFIG.dataSource === 'dataproject') {
       console.log('Iniciando SignalR para matchId:', CONFIG.matchId);
       initSignalR();
     } else {

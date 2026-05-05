@@ -838,11 +838,15 @@ async function loadConfigFromSupabase() {
       CONFIG.homeName  = home.name;
       CONFIG.homeColor = home.color_primary;
       CONFIG.homeStripe = [home.color_stripe_1, home.color_stripe_2, home.color_stripe_3];
+    } else if (cfg.home_raw_name) {
+      CONFIG.homeName = cfg.home_raw_name;
     }
     if (away) {
       CONFIG.awayName  = away.name;
       CONFIG.awayColor = away.color_primary;
       CONFIG.awayStripe = [away.color_stripe_1, away.color_stripe_2, away.color_stripe_3];
+    } else if (cfg.away_raw_name) {
+      CONFIG.awayName = cfg.away_raw_name;
     }
 
   } catch(e) {

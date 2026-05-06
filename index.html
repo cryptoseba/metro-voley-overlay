@@ -541,16 +541,28 @@ function processInitialScore(score) {
   const totalSets = homeSets + awaySets;
   const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
 
-  // Mostrar puntaje del último set jugado
-  const lastSetIdx = Math.max(0, totalSets - 1);
-  const key = setKeys[Math.min(lastSetIdx, 4)];
-  const hp = score[key + 'Home'] || 0;
-  const gp = score[key + 'Guest'] || 0;
+  let hp, gp, setLabel;
 
-  // Actualizar marcador con último set
+  if (status === 2) {
+    // Partido terminado — mostrar último set jugado
+    const lastSetIdx = Math.max(0, totalSets - 1);
+    const key = setKeys[Math.min(lastSetIdx, 4)];
+    hp = score[key + 'Home'] || 0;
+    gp = score[key + 'Guest'] || 0;
+    setLabel = `SET ${totalSets}`;
+  } else {
+    // Partido en curso — mostrar set actual
+    const currentSetIdx = Math.min(totalSets, 4);
+    const key = setKeys[currentSetIdx];
+    hp = score[key + 'Home'] || 0;
+    gp = score[key + 'Guest'] || 0;
+    setLabel = `SET ${totalSets + 1}`;
+  }
+
+  // Actualizar marcador con set actual/último
   document.getElementById('homeScore').textContent = hp;
   document.getElementById('awayScore').textContent = gp;
-  document.getElementById('setLabel').textContent = `SET ${totalSets}`;
+  document.getElementById('setLabel').textContent = setLabel;
   updateSets('homeSets', homeSets);
   updateSets('awaySets', awaySets);
   prevHome = hp;

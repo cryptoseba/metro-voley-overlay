@@ -462,6 +462,13 @@ async function initSignalR() {
     srPolling = true;
     console.log('Starting poll loop...');
     srPollLoop();
+
+    // Re-invoke periódico cada 5s como fallback si el poll no recibe mensajes
+    setInterval(async () => {
+      if (!srPolling) return;
+      const score = await srInvoke('getLiveScoreData_From_DV', [CONFIG.matchId, 'fmv']);
+      if (score) processInitialScore(score);
+    }, 5000);
   } catch(e) {
     console.log('SignalR proxy falló:', e.message);
     applyConfig(CONFIG.homeName, CONFIG.awayName);

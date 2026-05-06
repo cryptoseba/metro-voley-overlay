@@ -467,7 +467,28 @@ async function initSignalR() {
     setInterval(async () => {
       if (!srPolling) return;
       const score = await srInvoke('getLiveScoreData_From_DV', [CONFIG.matchId, 'fmv']);
-      if (score) processInitialScore(score);
+      if (!score) return;
+      const homeSets = score.WonSetHome || 0;
+      const awaySets = score.WonSetGuest || 0;
+      const status   = score.Status;
+      const totalSets = homeSets + awaySets;
+      const setKeys = ['Set1','Set2','Set3','Set4','Set5'];
+      const currentSetIdx = Math.min(totalSets, 4);
+      const key = setKeys[currentSetIdx];
+      const hp = score[key + 'Home'] || 0;
+      const gp = score[key + 'Guest'] || 0;
+      // Usar processScoreUpdate para mantener saque y detectar cambios
+      const mappedStatus = status === 2 ? 0 : status === 1 ? 3 : 1;
+      processScoreUpdate(hp, gp, homeSets, awaySets, mappedStatus);
+      // Si terminó, mostrar banner con sets reales
+      if (status === 2 && !resultShown) {
+        const sets = [];
+        for (let i = 0; i < totalSets; i++) {
+          sets.push({ homeTeamScore: score[setKeys[i]+'Home']||0, awayTeamScore: score[setKeys[i]+'Guest']||0 });
+        }
+        resultShown = true;
+        showResultBanner(homeSets, awaySets, sets);
+      }
     }, 5000);
   } catch(e) {
     console.log('SignalR proxy falló:', e.message);

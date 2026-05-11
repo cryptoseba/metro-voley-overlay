@@ -292,10 +292,9 @@ html, body {
 .carousel-slide {
   position: absolute; inset: 0;
   opacity: 0;
-  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.5s ease;
 }
 .carousel-slide.active { opacity: 1; }
-.carousel-slide.exit { opacity: 0; }
 .carousel-slide img {
   width: 100%; height: 100%;
   object-fit: cover; display: block;
@@ -479,7 +478,9 @@ async function initSignalR() {
       const gp = score[key + 'Guest'] || 0;
       // Usar processScoreUpdate para mantener saque y detectar cambios
       const mappedStatus = status === 2 ? 0 : status === 1 ? 3 : 1;
-      processScoreUpdate(hp, gp, homeSets, awaySets, mappedStatus);
+      if (status !== 2) {
+        processScoreUpdate(hp, gp, homeSets, awaySets, mappedStatus);
+      }
       // Si terminó, mostrar banner con sets reales
       if (status === 2 && !resultShown) {
         const sets = [];
@@ -489,7 +490,7 @@ async function initSignalR() {
         resultShown = true;
         showResultBanner(homeSets, awaySets, sets);
       }
-    }, 5000);
+    }, 2000);
   } catch(e) {
     console.log('SignalR proxy falló:', e.message);
     applyConfig(CONFIG.homeName, CONFIG.awayName);
@@ -507,8 +508,33 @@ async function srInvoke(method, args) {
       body: JSON.stringify({ token: srToken, messageId: srMsgId, method, args, invokeId: Date.now() })
     });
     const data = await res.json();
+    // Si el token expiró, re-negotiate
+    if (data.error && (data.error.includes('401') || data.error.includes('token') || data.error.includes('expired'))) {
+      console.log('Token expirado, re-negotiating...');
+      await srRenegotiate();
+      // Reintentar con token nuevo
+      const res2 = await fetch(`${PROXY_URL}/api/signalr/invoke`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token: srToken, messageId: srMsgId, method, args, invokeId: Date.now() })
+      });
+      const data2 = await res2.json();
+      return data2.result;
+    }
     return data.result;
   } catch(e) { return null; }
+}
+
+async function srRenegotiate() {
+  try {
+    const neg = await fetch(`${PROXY_URL}/api/signalr/negotiate?matchId=${CONFIG.matchId}`);
+    const negData = await neg.json();
+    if (negData.token) {
+      srToken = negData.token;
+      srMsgId = negData.messageId;
+      console.log('Re-negotiate OK');
+    }
+  } catch(e) { console.log('Re-negotiate falló:', e.message); }
 }
 
 async function srPollLoop() {
@@ -629,7 +655,7 @@ function showResultBanner(homeSets, awaySets, sets) {
   document.getElementById('result-banner').classList.add('visible');
 }
 
-function processScoreUpdate(hp, gp, homeSets, awaySets, status) {
+function processScoreUpdate(hp, gp, homeSets, awaySets, status, allSets) {
   // ── PARTIDO TERMINADO ──
   if (status === 0 && !resultShown) {
     resultShown = true;
@@ -699,7 +725,7 @@ function processScoreUpdate(hp, gp, homeSets, awaySets, status) {
     const winnerSide = homeSets > prevHomeSets ? 'home' : 'away';
     const matchWouldBeOver = homeSets >= 3 || awaySets >= 3;
     if (!matchWouldBeOver) {
-      showSetFinish(homeSets + awaySets, homeSets, awaySets, [], winnerSide);
+      showSetFinish(homeSets + awaySets, homeSets, awaySets, allSets || [], winnerSide);
     }
   }
 
@@ -742,16 +768,23 @@ async function fetchScoreFallback() {
     if (!CONFIG._namesApplied) { applyConfig(CONFIG.homeName, CONFIG.awayName); CONFIG._namesApplied = true; }
     const matchStatus = data.match?.statusId;
     if (matchStatus === 2 && !resultShown) {
-      const isHomeWinner = data.match.homeTeamSets > data.match.awayTeamSets;
-      processScoreUpdate(0, 0, data.match.homeTeamSets, data.match.awayTeamSets, 0);
+      resultShown = true;
+      // Armar sets con scores reales
+      const sets = (data.match.sets || [])
+        .sort((a, b) => a.number - b.number)
+        .map(s => ({ homeTeamScore: s.homeTeamScore || 0, awayTeamScore: s.awayTeamScore || 0 }));
+      showResultBanner(data.match.homeTeamSets, data.match.awayTeamSets, sets);
       return;
     }
     const score = data.liveState?.score;
     if (!score) return;
     const csNum = data.match?.currentSet ?? 1;
     const csData = data.match?.sets?.find(s => s.number === csNum);
+    const allSets = (data.match?.sets || [])
+      .sort((a,b) => a.number - b.number)
+      .map(s => ({ homeTeamScore: s.homeTeamScore||0, awayTeamScore: s.awayTeamScore||0 }));
     if (csData) {
-      processScoreUpdate(csData.homeTeamScore, csData.awayTeamScore, data.match.homeTeamSets, data.match.awayTeamSets, 3);
+      processScoreUpdate(csData.homeTeamScore, csData.awayTeamScore, data.match.homeTeamSets, data.match.awayTeamSets, 3, allSets);
     }
   } catch(e) {}
 }
@@ -986,12 +1019,26 @@ async function startCarousel() {
   let current = 0;
   function nextSlide() {
     const slides = banner.querySelectorAll('.carousel-slide');
-    const dur = (images[current]?.duration_seconds || 5) * 1000;
+    const next = (current + 1) % slides.length;
+    const fadeDuration = 600; // ms — debe coincidir con la transición CSS
+
+    // 1. Fade out del actual
     slides[current].classList.remove('active');
-    current = (current + 1) % slides.length;
-    slides[current].classList.add('active');
-    setTimeout(nextSlide, (images[current]?.duration_seconds || 5) * 1000);
+
+    // 2. Esperar que termine el fade out, luego fade in del siguiente
+    setTimeout(() => {
+      slides[current].style.zIndex = '0';
+      slides[next].style.zIndex = '1';
+      slides[next].classList.add('active');
+      current = next;
+      // 3. Programar el próximo cambio
+      setTimeout(nextSlide, (images[current]?.duration_seconds || 5) * 1000);
+    }, fadeDuration);
   }
+  // Inicializar z-index
+  banner.querySelectorAll('.carousel-slide').forEach((s, i) => {
+    s.style.zIndex = i === 0 ? '1' : '0';
+  });
   setTimeout(nextSlide, (images[0]?.duration_seconds || 5) * 1000);
 }
 
